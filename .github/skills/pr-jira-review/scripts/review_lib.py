@@ -105,27 +105,34 @@ def _read_json(url: str, headers: dict[str, str]) -> Any:
         raise ReviewError(f"Network error for {url}: {exc.reason}") from exc
 
 
+def _basic_auth_value(username: str, secret: str) -> str:
+    encoded = base64.b64encode(f"{username}:{secret}".encode("utf-8")).decode("ascii")
+    return f"Basic {encoded}"
+
+
 def _github_headers(env: dict[str, str]) -> dict[str, str]:
     headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "pr-jira-review-skill",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+    username = env.get("GITHUB_USERNAME", "").strip()
     token = env.get("GITHUB_TOKEN", "").strip()
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if username and token:
+        headers["Authorization"] = _basic_auth_value(username, token)
+    elif username or token:
+        raise ReviewError("GitHub Basic Auth requires both GITHUB_USERNAME and GITHUB_TOKEN.")
     return headers
 
 
 def _jira_headers(env: dict[str, str]) -> dict[str, str]:
-    email = env.get("JIRA_USER_EMAIL", "").strip()
-    token = env.get("JIRA_API_TOKEN", "").strip()
-    if not email or not token:
-        raise ReviewError("Live mode requires JIRA_USER_EMAIL and JIRA_API_TOKEN.")
-    auth = base64.b64encode(f"{email}:{token}".encode("utf-8")).decode("ascii")
+    username = env.get("JIRA_USERNAME", "").strip()
+    password = env.get("JIRA_PASSWORD", "").strip()
+    if not username or not password:
+        raise ReviewError("Live mode requires JIRA_USERNAME and JIRA_PASSWORD.")
     return {
         "Accept": "application/json",
-        "Authorization": f"Basic {auth}",
+        "Authorization": _basic_auth_value(username, password),
         "User-Agent": "pr-jira-review-skill",
     }
 

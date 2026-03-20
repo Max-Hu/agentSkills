@@ -133,13 +133,14 @@ Set the required Jira variables:
 
 ```powershell
 $env:JIRA_BASE_URL="https://your-company.atlassian.net"
-$env:JIRA_USER_EMAIL="dev@example.com"
-$env:JIRA_API_TOKEN="jira_xxx"
+$env:JIRA_USERNAME="jira-user"
+$env:JIRA_PASSWORD="jira-password"
 ```
 
-Optional GitHub and Jira settings:
+Set GitHub Basic Auth variables when GitHub authentication is needed:
 
 ```powershell
+$env:GITHUB_USERNAME="octocat"
 $env:GITHUB_TOKEN="ghp_xxx"
 $env:GITHUB_API_BASE_URL="https://api.github.com"
 $env:JIRA_ACCEPTANCE_FIELD_IDS="customfield_10010,customfield_10142"
@@ -147,7 +148,9 @@ $env:JIRA_ACCEPTANCE_FIELD_IDS="customfield_10010,customfield_10142"
 
 Notes:
 
-- `GITHUB_TOKEN` is strongly recommended for public repositories and effectively required for private repositories.
+- Jira live mode only supports `JIRA_USERNAME` + `JIRA_PASSWORD`.
+- GitHub auth only supports `GITHUB_USERNAME` + `GITHUB_TOKEN` via Basic Auth.
+- If you set either `GITHUB_USERNAME` or `GITHUB_TOKEN`, you must set both.
 - `GITHUB_API_BASE_URL` is useful for GitHub Enterprise or other non-`github.com` hosts.
 
 Run live mode:
@@ -226,10 +229,14 @@ Use the stricter prompt shown above or instruct chat to run the script directly 
 Check:
 
 - `JIRA_BASE_URL`
-- `JIRA_USER_EMAIL`
-- `JIRA_API_TOKEN`
-- `GITHUB_TOKEN` when the repository is private
+- `JIRA_USERNAME`
+- `JIRA_PASSWORD`
+- `GITHUB_USERNAME` and `GITHUB_TOKEN` together when GitHub auth is needed
 - network access to GitHub and Jira
+
+### GitHub auth fails
+
+If you configured GitHub auth, make sure both `GITHUB_USERNAME` and `GITHUB_TOKEN` are set. The script does not accept only one of them.
 
 ### GitHub Enterprise host returns the wrong API base
 

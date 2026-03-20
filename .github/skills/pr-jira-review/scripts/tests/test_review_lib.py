@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import unittest
 from pathlib import Path
 
@@ -9,7 +10,16 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from review_lib import build_review, extract_jira_keys, extract_pr_url, load_mock_bundle, parse_pr_url
+from review_lib import (
+    ReviewError,
+    _github_headers,
+    _jira_headers,
+    build_review,
+    extract_jira_keys,
+    extract_pr_url,
+    load_mock_bundle,
+    parse_pr_url,
+)
 
 
 class ReviewLibTests(unittest.TestCase):
@@ -42,6 +52,20 @@ class ReviewLibTests(unittest.TestCase):
         self.assertIn("## Jira Context", markdown)
         self.assertIn("PAY-248", markdown)
         self.assertIn("## Recommendation", markdown)
+
+    def test_github_basic_auth_header(self) -> None:
+        headers = _github_headers({"GITHUB_USERNAME": "octocat", "GITHUB_TOKEN": "ghp_xxx"})
+        expected = base64.b64encode(b"octocat:ghp_xxx").decode("ascii")
+        self.assertEqual(headers["Authorization"], f"Basic {expected}")
+
+    def test_jira_basic_auth_header(self) -> None:
+        headers = _jira_headers({"JIRA_USERNAME": "jira-user", "JIRA_PASSWORD": "jira-password"})
+        expected = base64.b64encode(b"jira-user:jira-password").decode("ascii")
+        self.assertEqual(headers["Authorization"], f"Basic {expected}")
+
+    def test_github_basic_auth_requires_both_values(self) -> None:
+        with self.assertRaises(ReviewError):
+            _github_headers({"GITHUB_USERNAME": "octocat"})
 
 
 if __name__ == "__main__":
