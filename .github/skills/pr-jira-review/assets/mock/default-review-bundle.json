@@ -1,0 +1,140 @@
+{
+  "pr_url": "https://github.com/acme/payments-service/pull/123",
+  "pull": {
+    "number": 123,
+    "title": "PAY-248 Add idempotency checks to refund webhook",
+    "body": "## Summary\nPrevent duplicate refund processing when Stripe retries webhook delivery.\n\n## Jira\nPAY-248\n",
+    "html_url": "https://github.com/acme/payments-service/pull/123",
+    "state": "open",
+    "draft": false,
+    "additions": 214,
+    "deletions": 46,
+    "changed_files": 7,
+    "created_at": "2026-03-19T08:00:00Z",
+    "updated_at": "2026-03-19T10:15:00Z",
+    "user": {
+      "login": "alice"
+    },
+    "head": {
+      "ref": "feature/PAY-248-refund-idempotency"
+    },
+    "base": {
+      "ref": "main"
+    }
+  },
+  "files": [
+    {
+      "filename": "src/payments/refund_service.py",
+      "status": "modified",
+      "additions": 82,
+      "deletions": 10
+    },
+    {
+      "filename": "src/webhooks/refund_handler.py",
+      "status": "modified",
+      "additions": 61,
+      "deletions": 9
+    },
+    {
+      "filename": "src/storage/refund_repository.py",
+      "status": "modified",
+      "additions": 24,
+      "deletions": 6
+    },
+    {
+      "filename": "tests/test_refund_handler.py",
+      "status": "modified",
+      "additions": 31,
+      "deletions": 2
+    },
+    {
+      "filename": "tests/test_refund_repository.py",
+      "status": "modified",
+      "additions": 12,
+      "deletions": 0
+    },
+    {
+      "filename": "docs/runbooks/refund-retry.md",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "filename": "migrations/20260318_add_refund_idempotency_key.sql",
+      "status": "added",
+      "additions": 15,
+      "deletions": 0
+    }
+  ],
+  "commits": [
+    {
+      "sha": "90ad123",
+      "commit": {
+        "message": "PAY-248 add refund idempotency key migration"
+      }
+    },
+    {
+      "sha": "90ad124",
+      "commit": {
+        "message": "PAY-248 reject duplicate refund events before side effects"
+      }
+    }
+  ],
+  "issue_comments": [
+    {
+      "user": {
+        "login": "zoe-pm"
+      },
+      "body": "Please verify this still matches PAY-248 acceptance criteria and duplicate Stripe retries."
+    }
+  ],
+  "review_comments": [
+    {
+      "user": {
+        "login": "bob"
+      },
+      "body": "What happens if the webhook acknowledgement fails after the idempotency key is written?"
+    }
+  ],
+  "jira_issues": {
+    "PAY-248": {
+      "key": "PAY-248",
+      "fields": {
+        "summary": "Prevent duplicate refund processing during Stripe webhook retries",
+        "description": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Create idempotent handling for refund webhooks to avoid duplicate payout adjustments."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Acceptance Criteria: duplicate webhook deliveries do not create multiple refund records; retries are logged with enough context for support."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "In Progress"
+        },
+        "priority": {
+          "name": "High"
+        },
+        "assignee": {
+          "displayName": "Zoe Product"
+        },
+        "customfield_10010": "Duplicate webhook deliveries do not create multiple refund records.\nRetries are logged with enough context for support."
+      }
+    }
+  }
+}

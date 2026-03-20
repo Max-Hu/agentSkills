@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Jira Review"
+  short_description: "Review GitHub PRs against Jira context"
+  default_prompt: "Use $pr-jira-review to review a GitHub PR URL against Jira requirements."
