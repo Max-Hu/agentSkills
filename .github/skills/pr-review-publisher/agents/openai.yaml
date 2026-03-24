@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Review Publisher"
+  short_description: "Publish or update the managed PR review comment"
+  default_prompt: "Use $pr-review-publisher to publish this review draft to the PR as a managed comment, updating the existing managed comment when one is already present."

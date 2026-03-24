@@ -27,13 +27,15 @@
       "filename": "src/payments/refund_service.py",
       "status": "modified",
       "additions": 82,
-      "deletions": 10
+      "deletions": 10,
+      "patch": "@@\n+def process_refund(event, seen_ids=[]):\n+    try:\n+        refund_id = event['id']\n+        print(f'refund webhook {refund_id}')\n+    except Exception:\n+        return None\n"
     },
     {
       "filename": "src/webhooks/refund_handler.py",
       "status": "modified",
       "additions": 61,
-      "deletions": 9
+      "deletions": 9,
+      "patch": "@@\n+TODO: tighten retry handling before merge\n+if payload.get('token'):\n+    logger.info('token present')\n"
     },
     {
       "filename": "src/storage/refund_repository.py",
@@ -45,7 +47,8 @@
       "filename": "tests/test_refund_handler.py",
       "status": "modified",
       "additions": 31,
-      "deletions": 2
+      "deletions": 2,
+      "patch": "@@\n+def test_duplicate_event_is_ignored():\n+    assert process_event(payload) is None\n"
     },
     {
       "filename": "tests/test_refund_repository.py",
@@ -63,7 +66,8 @@
       "filename": "migrations/20260318_add_refund_idempotency_key.sql",
       "status": "added",
       "additions": 15,
-      "deletions": 0
+      "deletions": 0,
+      "patch": "@@\n+ALTER TABLE refunds ADD COLUMN idempotency_key TEXT;\n"
     }
   ],
   "commits": [
@@ -109,16 +113,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Create idempotent handling for refund webhooks to avoid duplicate payout adjustments."
-                }
-              ]
-            },
-            {
-              "type": "paragraph",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "Acceptance Criteria: duplicate webhook deliveries do not create multiple refund records; retries are logged with enough context for support."
+                  "text": "Create idempotent handling for refund webhooks to avoid duplicate payout adjustments and repeat side effects."
                 }
               ]
             }
@@ -132,9 +127,22 @@
         },
         "assignee": {
           "displayName": "Zoe Product"
+        }
+      },
+      "comments": [
+        {
+          "author": {
+            "displayName": "Zoe Product"
+          },
+          "body": "Please confirm duplicate Stripe deliveries do not create multiple refund records."
         },
-        "customfield_10010": "Duplicate webhook deliveries do not create multiple refund records.\nRetries are logged with enough context for support."
-      }
+        {
+          "author": {
+            "displayName": "FinOps Reviewer"
+          },
+          "body": "Support also needs enough context to trace retries in logs."
+        }
+      ]
     }
   }
 }

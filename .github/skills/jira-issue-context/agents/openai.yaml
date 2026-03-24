@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jira Issue Context"
+  short_description: "Load linked Jira issues and comments for a PR bundle"
+  default_prompt: "Use $jira-issue-context to extract Jira keys from this GitHub bundle and return the normalized Jira context JSON."

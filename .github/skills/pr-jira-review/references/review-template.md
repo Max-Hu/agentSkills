@@ -1,23 +1,19 @@
 # Review Template
 
-The script emits the following fixed Markdown structure:
+The writer should emit this final Markdown structure:
 
 1. `# PR Review`
 2. `## Review Scope`
-3. `## PR Summary`
-4. `## Jira Context`
-5. `## Jira Alignment`
-6. `## Risk Assessment`
-7. `## Test Assessment`
-8. `## Reviewer Questions`
-9. `## Recommendation`
-10. `## Positive Signals`
+3. `## Findings Summary`
+4. `## Detailed Analysis And Suggested Fixes`
+5. `## Evidence Sources`
+6. `## Recommendation`
+7. `## Positive Signals`
 
-Use this structure by default. Keep the emphasis on:
+Rules:
 
-- Whether the PR is traceable to one or more Jira issues
-- Whether the implementation appears to satisfy Jira intent and acceptance criteria
-- Whether the code change introduces operational, data, or rollout risk
-- Whether tests changed in proportion to the code change
-
-If a section has no findings, explicitly say so instead of removing the section.
+- `Findings Summary` must be ordered by severity descending.
+- Use GitHub-compatible emoji severity markers such as `🔴/🟠/🟡/🟢`.
+- `Detailed Analysis And Suggested Fixes` must include actionable modification suggestions for each finding.
+- `Evidence Sources` must show the scanned Jira, PR, commits, comments, and diff-file sources.
+- If a section has no strong findings, say so explicitly instead of deleting the section.

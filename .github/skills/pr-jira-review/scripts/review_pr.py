@@ -12,6 +12,8 @@ from review_lib import ReviewError, build_review
 
 
 def main() -> int:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser(description="Review a GitHub PR against Jira context.")
     parser.add_argument("--pr-url", help="GitHub pull request URL")
     parser.add_argument("--prompt-text", help="Full user prompt containing the PR URL")
@@ -27,6 +29,10 @@ def main() -> int:
         help="Path to a mock bundle JSON file.",
     )
     parser.add_argument(
+        "--draft-path",
+        help="Optional path for writing an editable Markdown draft.",
+    )
+    parser.add_argument(
         "--output",
         choices=("markdown", "json"),
         default="markdown",
@@ -40,6 +46,7 @@ def main() -> int:
             prompt_text=args.prompt_text,
             mode=args.mode,
             mock_data_path=args.mock_data,
+            draft_path=args.draft_path,
         )
     except ReviewError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -54,3 +61,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

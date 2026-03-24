@@ -1,4 +1,4 @@
 interface:
   display_name: "PR Jira Review"
-  short_description: "Review GitHub PRs against Jira context"
-  default_prompt: "Use $pr-jira-review to review a GitHub PR URL against Jira requirements."
+  short_description: "Orchestrate evidence-backed PR reviews, drafts, and managed publishing"
+  default_prompt: "Use $pr-jira-review to review this PR URL. Gather GitHub and Jira context, decide whether subagents are warranted, produce an evidence-backed Markdown review draft, and return the draft path plus managed publish target."
