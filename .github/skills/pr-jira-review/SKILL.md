@@ -20,11 +20,17 @@ Use this as the single entrypoint skill. Keep the user experience simple: one pr
 6. Generate the review report and Markdown draft.
 7. If the user asks to publish, publish or update the managed PR comment.
 
-Run the orchestrator first:
+Run the orchestrator first with the script that matches the user's system:
 
 ```powershell
-python .github/skills/pr-jira-review/scripts/review_pr.py --pr-url "<pr-url>" --mode auto --output json --draft-path "pr-review-drafts\pr-<number>-review.md"
+.github/skills/pr-jira-review/scripts/review_pr.ps1 -PrUrl "<pr-url>" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
 ```
+
+```bash
+.github/skills/pr-jira-review/scripts/review_pr.sh --pr-url "<pr-url>" --mode auto --output json --draft-path "pr-review-drafts/pr-<number>-review.md"
+```
+
+Bash mode expects `node` and `curl` to be available.
 
 Read these fields from the JSON result:
 
@@ -82,11 +88,14 @@ Default output is an editable Markdown draft on disk.
 1. Generate the draft with `pr-jira-review` or `pr-review-writer`.
 2. Edit the draft if needed.
 3. Publish with `pr-review-publisher`.
-4. On later publishes, update the same managed PR comment instead of creating a new one.
+4. On later publishes, update the same managed PR comment.
 
 Publish command:
 
 ```powershell
-python .github/skills/pr-review-publisher/scripts/pr_review_publisher.py --pr-url "<pr-url>" --input "pr-review-drafts\pr-<number>-review.md" --mode real
+.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "<pr-url>" -DraftPath "pr-review-drafts\pr-<number>-review.md" -Mode real
 ```
 
+```bash
+.github/skills/pr-review-publisher/scripts/pr_review_publisher.sh --pr-url "<pr-url>" --input "pr-review-drafts/pr-<number>-review.md" --mode real
+```

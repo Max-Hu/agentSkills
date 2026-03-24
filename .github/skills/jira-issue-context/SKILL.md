@@ -7,10 +7,16 @@ description: Extract Jira keys from a PR bundle and fetch Jira issue context as 
 
 Use this skill after GitHub PR context is available.
 
-Run:
+Use the script that matches the user's system:
 
 ```powershell
-python .github/skills/jira-issue-context/scripts/jira_issue_context.py --input "<github-bundle.json>" --mode auto
+.github/skills/jira-issue-context/scripts/jira_issue_context.ps1 -InputPath "<github-bundle.json>" -Mode auto
 ```
+
+```bash
+.github/skills/jira-issue-context/scripts/jira_issue_context.sh --input "<github-bundle.json>" --mode auto
+```
+
+Bash mode expects `node` and `curl` to be available.
 
 Return the JSON Jira bundle. Do not write the final review in this skill.

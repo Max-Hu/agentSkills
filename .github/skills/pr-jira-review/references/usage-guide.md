@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-`pr-jira-review` is now the orchestrator skill for a multi-skill review workflow:
+`pr-jira-review` is the orchestrator skill for this review workflow:
 
 1. collect GitHub PR context
 2. collect Jira issue context
@@ -35,11 +35,19 @@ The orchestrator should:
 
 ## 3. Orchestrator Command
 
-From `<repo-root>`:
+Windows / PowerShell:
 
 ```powershell
-python .github/skills/pr-jira-review/scripts/review_pr.py --pr-url "https://github.com/acme/payments-service/pull/123" --mode auto --output json --draft-path "pr-review-drafts\pr-123-review.md"
+.github/skills/pr-jira-review/scripts/review_pr.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
 ```
+
+macOS / Linux / Bash:
+
+```bash
+.github/skills/pr-jira-review/scripts/review_pr.sh --pr-url "https://github.com/acme/payments-service/pull/123" --mode auto --output json --draft-path "pr-review-drafts/pr-123-review.md"
+```
+
+Bash mode expects `node` and `curl` to be available.
 
 The JSON output includes:
 
@@ -55,25 +63,41 @@ The JSON output includes:
 GitHub context only:
 
 ```powershell
-python .github/skills/github-pr-context/scripts/github_pr_context.py --pr-url "https://github.com/acme/payments-service/pull/123" --mode auto
+.github/skills/github-pr-context/scripts/github_pr_context.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto
+```
+
+```bash
+.github/skills/github-pr-context/scripts/github_pr_context.sh --pr-url "https://github.com/acme/payments-service/pull/123" --mode auto
 ```
 
 Jira context only:
 
 ```powershell
-python .github/skills/jira-issue-context/scripts/jira_issue_context.py --input "github-bundle.json" --mode auto
+.github/skills/jira-issue-context/scripts/jira_issue_context.ps1 -InputPath "github-bundle.json" -Mode auto
 ```
 
-Write review from existing combined bundle:
+```bash
+.github/skills/jira-issue-context/scripts/jira_issue_context.sh --input "github-bundle.json" --mode auto
+```
+
+Write review from an existing combined bundle:
 
 ```powershell
-python .github/skills/pr-review-writer/scripts/pr_review_writer.py --input "combined-bundle.json" --output json --draft-path "pr-review-drafts\pr-123-review.md"
+.github/skills/pr-review-writer/scripts/pr_review_writer.ps1 -InputPath "combined-bundle.json" -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
+```
+
+```bash
+.github/skills/pr-review-writer/scripts/pr_review_writer.sh --input "combined-bundle.json" --output json --draft-path "pr-review-drafts/pr-123-review.md"
 ```
 
 Publish or update the managed PR comment:
 
 ```powershell
-python .github/skills/pr-review-publisher/scripts/pr_review_publisher.py --pr-url "https://github.com/acme/payments-service/pull/123" --input "pr-review-drafts\pr-123-review.md" --mode real
+.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -DraftPath "pr-review-drafts\pr-123-review.md" -Mode real
+```
+
+```bash
+.github/skills/pr-review-publisher/scripts/pr_review_publisher.sh --pr-url "https://github.com/acme/payments-service/pull/123" --input "pr-review-drafts/pr-123-review.md" --mode real
 ```
 
 ## 5. Subagent Guidance
@@ -109,8 +133,16 @@ Managed marker:
 
 ## 7. Verification Commands
 
+PowerShell smoke path:
+
 ```powershell
-python .github/skills/pr-jira-review/scripts/review_pr.py --pr-url "https://github.com/acme/payments-service/pull/123" --mode mock --output json --draft-path "pr-review-drafts\pr-123-review.md"
-python -m unittest discover -s .github/skills/pr-jira-review/scripts/tests -v
+.github/skills/pr-jira-review/scripts/review_pr.ps1 -Mode mock -OutputFormat json -DraftPath "test-output\pr-123-review.md"
+.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -DraftPath "test-output\pr-123-review.md" -Mode mock
 ```
 
+Bash smoke path:
+
+```bash
+.github/skills/pr-jira-review/scripts/review_pr.sh --mode mock --output json --draft-path "test-output/pr-123-review.md"
+.github/skills/pr-review-publisher/scripts/pr_review_publisher.sh --pr-url "https://github.com/acme/payments-service/pull/123" --input "test-output/pr-123-review.md" --mode mock
+```
