@@ -1,22 +1,22 @@
 ---
 name: pr-review-writer
-description: Turn a combined GitHub and Jira evidence bundle into a structured review report and editable Markdown draft. Use when the user already has normalized PR/Jira evidence, wants only the writing stage, or wants to regenerate the draft without refetching external data.
+description: Turn a combined GitHub and Jira evidence bundle into a structured review report and editable Markdown draft. The current expert implementation is Java-focused and runs through a dedicated Java analyzer module without changing the stable writer entrypoint.
 ---
 
 # PR Review Writer
 
-Use this skill when the evidence bundle already exists and the remaining task is analysis plus draft generation.
+Use this skill when the evidence bundle already exists and the remaining task is review analysis plus draft generation.
 
-Use the script that matches the user's system:
+Use the PowerShell script:
 
 ```powershell
 .github/skills/pr-review-writer/scripts/pr_review_writer.ps1 -InputPath "<combined-bundle.json>" -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
 ```
 
-```bash
-.github/skills/pr-review-writer/scripts/pr_review_writer.sh --input "<combined-bundle.json>" --output json --draft-path "pr-review-drafts/pr-<number>-review.md"
-```
-
-Bash mode expects `node` to be available.
+Current active expert reviewer: `Senior Java/Spring Reviewer`.
+Current code review mode: `java-expert-diff`.
+The code-level review is limited to Java ecosystem files such as `.java`, Spring configuration, runtime resource config, build config, and logging config.
+The stable writer entrypoint stays generic; the Java expert implementation is highlighted under `scripts/analyzers/java/java_expert_analyzer.ps1`.
+The writer is diff-based only and does not use AST, Maven/Gradle compilation, or external Java tooling.
 
 Return the report JSON and draft metadata, or the Markdown review if the user explicitly wants Markdown only.

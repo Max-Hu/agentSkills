@@ -1,4 +1,4 @@
 interface:
-  display_name: "PR Review Writer"
-  short_description: "Analyze evidence and write the editable review draft"
-  default_prompt: "Use $pr-review-writer to turn this combined PR and Jira bundle into an evidence-backed review report and write an editable Markdown draft."
+  display_name: "PR Review Writer [Java Expert Active]"
+  short_description: "Analyze evidence and write the editable review draft with the current Java expert reviewer"
+  default_prompt: "Use $pr-review-writer to turn this combined PR and Jira bundle into an evidence-backed review report and write an editable Markdown draft with the current Java expert reviewer."

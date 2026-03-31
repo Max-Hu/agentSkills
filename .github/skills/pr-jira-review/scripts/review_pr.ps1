@@ -131,7 +131,7 @@ function Get-Orchestration([string]$RequestedMode, [string]$ModeUsed, [string]$R
             @(
                 @{ name = 'Agent A'; role = 'GitHub Context Worker'; responsibility = 'Fetch PR metadata, files, commits, and comments.' },
                 @{ name = 'Agent B'; role = 'Jira Context Worker'; responsibility = 'Extract Jira keys and gather issue context in parallel.' },
-                @{ name = 'Agent C'; role = 'Review Analysis Worker'; responsibility = 'Analyze the combined evidence once context workers complete.' }
+                @{ name = 'Agent C'; role = 'Java Expert Review Worker'; responsibility = 'Analyze the combined evidence as a senior Java/Spring reviewer once context workers complete.' }
             )
         } else {
             @()
@@ -190,6 +190,7 @@ try {
 } catch {
     Fail $_.Exception.Message
 }
+
 
 
 

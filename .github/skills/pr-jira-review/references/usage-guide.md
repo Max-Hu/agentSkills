@@ -16,7 +16,13 @@ The sibling skills are:
 - `pr-review-writer`
 - `pr-review-publisher`
 
-## 2. Default Usage
+## 2. Current Expert Module
+
+The public skill entrypoints remain generic.
+The current active expert reviewer is `Senior Java/Spring Reviewer` in `java-expert-diff` mode.
+The Java expert implementation is highlighted under `scripts/analyzers/java/`, and the orchestrator reuses that Java analyzer path through the writer entrypoint.
+
+## 3. Default Usage
 
 For normal usage, call only the orchestrator:
 
@@ -33,21 +39,13 @@ The orchestrator should:
 - write an editable Markdown draft
 - expose the publish target for later comment publishing
 
-## 3. Orchestrator Command
+## 4. Orchestrator Command
 
-Windows / PowerShell:
+PowerShell:
 
 ```powershell
 .github/skills/pr-jira-review/scripts/review_pr.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
 ```
-
-macOS / Linux / Bash:
-
-```bash
-.github/skills/pr-jira-review/scripts/review_pr.sh --pr-url "https://github.com/acme/payments-service/pull/123" --mode auto --output json --draft-path "pr-review-drafts/pr-123-review.md"
-```
-
-Bash mode expects `node` and `curl` to be available.
 
 The JSON output includes:
 
@@ -58,16 +56,12 @@ The JSON output includes:
 - `draft`
 - `publish_target`
 
-## 4. Capability Commands
+## 5. Capability Commands
 
 GitHub context only:
 
 ```powershell
 .github/skills/github-pr-context/scripts/github_pr_context.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto
-```
-
-```bash
-.github/skills/github-pr-context/scripts/github_pr_context.sh --pr-url "https://github.com/acme/payments-service/pull/123" --mode auto
 ```
 
 Jira context only:
@@ -76,18 +70,16 @@ Jira context only:
 .github/skills/jira-issue-context/scripts/jira_issue_context.ps1 -InputPath "github-bundle.json" -Mode auto
 ```
 
-```bash
-.github/skills/jira-issue-context/scripts/jira_issue_context.sh --input "github-bundle.json" --mode auto
-```
-
 Write review from an existing combined bundle:
 
 ```powershell
 .github/skills/pr-review-writer/scripts/pr_review_writer.ps1 -InputPath "combined-bundle.json" -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
 ```
 
-```bash
-.github/skills/pr-review-writer/scripts/pr_review_writer.sh --input "combined-bundle.json" --output json --draft-path "pr-review-drafts/pr-123-review.md"
+Current Java expert module path:
+
+```text
+.github/skills/pr-review-writer/scripts/analyzers/java/java_expert_analyzer.ps1
 ```
 
 Publish or update the managed PR comment:
@@ -96,11 +88,7 @@ Publish or update the managed PR comment:
 .github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -DraftPath "pr-review-drafts\pr-123-review.md" -Mode real
 ```
 
-```bash
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.sh --pr-url "https://github.com/acme/payments-service/pull/123" --input "pr-review-drafts/pr-123-review.md" --mode real
-```
-
-## 5. Subagent Guidance
+## 6. Subagent Guidance
 
 The orchestrator should prefer local execution unless at least one of these is true:
 
@@ -113,36 +101,13 @@ Recommended split:
 
 - `Agent A`: GitHub Context Worker
 - `Agent B`: Jira Context Worker
-- `Agent C`: Review Analysis Worker
+- `Agent C`: Java Expert Review Worker
 - main agent: integration, final draft, publish decision
-
-## 6. Draft and Publish Model
-
-The review draft is the editable source of truth.
-
-- Generate the draft first.
-- Edit the Markdown if needed.
-- Publish from the draft file.
-- Future publishes update the same managed PR issue comment instead of creating a new one.
-
-Managed marker:
-
-```html
-<!-- pr-review-report:managed -->
-```
 
 ## 7. Verification Commands
 
 PowerShell smoke path:
 
 ```powershell
-.github/skills/pr-jira-review/scripts/review_pr.ps1 -Mode mock -OutputFormat json -DraftPath "test-output\pr-123-review.md"
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -DraftPath "test-output\pr-123-review.md" -Mode mock
-```
-
-Bash smoke path:
-
-```bash
-.github/skills/pr-jira-review/scripts/review_pr.sh --mode mock --output json --draft-path "test-output/pr-123-review.md"
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.sh --pr-url "https://github.com/acme/payments-service/pull/123" --input "test-output/pr-123-review.md" --mode mock
+.github/skills/pr-jira-review/scripts/tests/smoke_review_skill.ps1
 ```

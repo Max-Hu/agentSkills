@@ -2,21 +2,21 @@
   "pr_url": "https://github.com/acme/payments-service/pull/123",
   "pull": {
     "number": 123,
-    "title": "PAY-248 Add idempotency checks to refund webhook",
-    "body": "## Summary\nPrevent duplicate refund processing when Stripe retries webhook delivery.\n\n## Jira\nPAY-248\n",
+    "title": "PAY-517 Harden refund webhook idempotency for Spring service",
+    "body": "## Summary\nProtect the Java refund webhook flow from duplicate delivery and unsafe retries.\n\n## Jira\nPAY-517\n",
     "html_url": "https://github.com/acme/payments-service/pull/123",
     "state": "open",
     "draft": false,
-    "additions": 214,
-    "deletions": 46,
+    "additions": 248,
+    "deletions": 61,
     "changed_files": 7,
-    "created_at": "2026-03-19T08:00:00Z",
-    "updated_at": "2026-03-19T10:15:00Z",
+    "created_at": "2026-03-28T08:00:00Z",
+    "updated_at": "2026-03-28T10:15:00Z",
     "user": {
       "login": "alice"
     },
     "head": {
-      "ref": "feature/PAY-248-refund-idempotency"
+      "ref": "feature/PAY-517-java-refund-idempotency"
     },
     "base": {
       "ref": "main"
@@ -24,63 +24,65 @@
   },
   "files": [
     {
-      "filename": "src/payments/refund_service.py",
+      "filename": "src/main/java/com/acme/payments/refund/RefundService.java",
       "status": "modified",
-      "additions": 82,
-      "deletions": 10,
-      "patch": "@@\n+def process_refund(event, seen_ids=[]):\n+    try:\n+        refund_id = event['id']\n+        print(f'refund webhook {refund_id}')\n+    except Exception:\n+        return None\n"
+      "additions": 92,
+      "deletions": 14,
+      "patch": "@@\n+    repository.markProcessed(eventId);\n+    ledgerClient.applyRefund(refundRequest);\n+    try {\n+        logger.info(\"processed webhook token {}\", token);\n+    } catch (Exception ex) {\n+        return null;\n+    }\n"
     },
     {
-      "filename": "src/webhooks/refund_handler.py",
+      "filename": "src/main/java/com/acme/payments/web/RefundWebhookController.java",
       "status": "modified",
-      "additions": 61,
-      "deletions": 9,
-      "patch": "@@\n+TODO: tighten retry handling before merge\n+if payload.get('token'):\n+    logger.info('token present')\n"
+      "additions": 37,
+      "deletions": 6,
+      "patch": "@@\n+    var refund = refundRepository.findById(refundId).get();\n+    return ResponseEntity.ok(refund);\n"
     },
     {
-      "filename": "src/storage/refund_repository.py",
+      "filename": "src/main/resources/application.yml",
       "status": "modified",
-      "additions": 24,
-      "deletions": 6
+      "additions": 41,
+      "deletions": 8,
+      "patch": "@@\n+payments:\n+  refund:\n+    webhook-secret: changeme\n+    retry:\n+      max-attempts: 20\n+spring:\n+  main:\n+    allow-bean-definition-overriding: true\n"
     },
     {
-      "filename": "tests/test_refund_handler.py",
+      "filename": "pom.xml",
       "status": "modified",
-      "additions": 31,
+      "additions": 21,
+      "deletions": 3,
+      "patch": "@@\n+    <maven.test.skip>true</maven.test.skip>\n+    <java.version>21</java.version>\n+    <spring-boot.version>3.3.1</spring-boot.version>\n"
+    },
+    {
+      "filename": "src/main/resources/logback-spring.xml",
+      "status": "modified",
+      "additions": 19,
       "deletions": 2,
-      "patch": "@@\n+def test_duplicate_event_is_ignored():\n+    assert process_event(payload) is None\n"
+      "patch": "@@\n+<pattern>%d %-5level %logger - token=%X{token} auth=%X{Authorization} %msg%n</pattern>\n+<root level=\"DEBUG\">\n"
     },
     {
-      "filename": "tests/test_refund_repository.py",
+      "filename": "src/test/java/com/acme/payments/refund/RefundServiceTest.java",
       "status": "modified",
-      "additions": 12,
-      "deletions": 0
+      "additions": 28,
+      "deletions": 1,
+      "patch": "@@\n+    @Test\n+    void ignoresDuplicateWebhook() {\n+        assertThat(service.process(event)).isNull();\n+    }\n"
     },
     {
-      "filename": "docs/runbooks/refund-retry.md",
+      "filename": "docs/runbooks/refund-webhook.md",
       "status": "modified",
-      "additions": 4,
+      "additions": 10,
       "deletions": 0
-    },
-    {
-      "filename": "migrations/20260318_add_refund_idempotency_key.sql",
-      "status": "added",
-      "additions": 15,
-      "deletions": 0,
-      "patch": "@@\n+ALTER TABLE refunds ADD COLUMN idempotency_key TEXT;\n"
     }
   ],
   "commits": [
     {
-      "sha": "90ad123",
+      "sha": "90ad223",
       "commit": {
-        "message": "PAY-248 add refund idempotency key migration"
+        "message": "PAY-517 harden refund idempotency ordering in Java service"
       }
     },
     {
-      "sha": "90ad124",
+      "sha": "90ad224",
       "commit": {
-        "message": "PAY-248 reject duplicate refund events before side effects"
+        "message": "PAY-517 tighten Spring config for refund webhook path"
       }
     }
   ],
@@ -89,7 +91,7 @@
       "user": {
         "login": "zoe-pm"
       },
-      "body": "Please verify this still matches PAY-248 acceptance criteria and duplicate Stripe retries."
+      "body": "Please prove duplicate Stripe deliveries do not replay refund side effects in the Java service path."
     }
   ],
   "review_comments": [
@@ -97,14 +99,14 @@
       "user": {
         "login": "bob"
       },
-      "body": "What happens if the webhook acknowledgement fails after the idempotency key is written?"
+      "body": "If markProcessed runs before ledgerClient.applyRefund, how does a retry recover from a downstream failure?"
     }
   ],
   "jira_issues": {
-    "PAY-248": {
-      "key": "PAY-248",
+    "PAY-517": {
+      "key": "PAY-517",
       "fields": {
-        "summary": "Prevent duplicate refund processing during Stripe webhook retries",
+        "summary": "Harden Java refund webhook processing against duplicate delivery",
         "description": {
           "type": "doc",
           "content": [
@@ -113,7 +115,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Create idempotent handling for refund webhooks to avoid duplicate payout adjustments and repeat side effects."
+                  "text": "Ensure the Spring refund webhook path remains idempotent under retries, keeps secrets out of logs, and preserves downstream failure visibility."
                 }
               ]
             }
@@ -134,13 +136,13 @@
           "author": {
             "displayName": "Zoe Product"
           },
-          "body": "Please confirm duplicate Stripe deliveries do not create multiple refund records."
+          "body": "Confirm duplicate webhook deliveries do not create duplicate refund side effects."
         },
         {
           "author": {
-            "displayName": "FinOps Reviewer"
+            "displayName": "Platform Reviewer"
           },
-          "body": "Support also needs enough context to trace retries in logs."
+          "body": "Operations also needs masked logging and a stable retry contract for this Spring service."
         }
       ]
     }

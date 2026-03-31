@@ -15,8 +15,9 @@ $CategoryOrder = @{ "Jira Alignment" = 0; "Implementation Risk" = 1; "Code Quali
 $Stopwords = @("a","an","and","are","for","from","the","this","that","with","into","when","during","still","does","not")
 $DocExtensions = @(".md", ".txt", ".rst", ".adoc")
 $HighRiskPathHints = @("migration", "schema", "payment", "billing", "auth", "permission", "security", "terraform", "k8s", "helm", "config", "sql")
-$LanguageByExtension = @{ ".py" = "Python"; ".java" = "Java" }
-
+$JavaExpertAnalyzerPath = Join-Path $PSScriptRoot 'analyzers\java\java_expert_analyzer.ps1'
+if (-not (Test-Path $JavaExpertAnalyzerPath)) { throw "Missing Java expert analyzer at $JavaExpertAnalyzerPath" }
+. $JavaExpertAnalyzerPath
 function Fail([string]$Message) {
     Write-Error $Message
     exit 1
@@ -68,19 +69,19 @@ function Get-JiraIssueSummary([object]$Issue) {
     }
     $commentExcerpts = @()
     foreach ($comment in $commentEntries | Select-Object -First 6) {
-        $author = if ($comment.PSObject.Properties.Name -contains 'user' -and $comment.user.PSObject.Properties.Name -contains 'login') { $comment.user.login } elseif ($comment.PSObject.Properties.Name -contains 'author' -and $comment.author.PSObject.Properties.Name -contains 'displayName') { $comment.author.displayName } else { "unknown" }
+        $author = if ($comment.PSObject.Properties.Name -contains 'user' -and $comment.user.PSObject.Properties.Name -contains 'login') { $comment.user.login } elseif ($comment.PSObject.Properties.Name -contains 'author' -and $comment.author.PSObject.Properties.Name -contains 'displayName') { $comment.author.displayName } else { 'unknown' }
         $body = [regex]::Replace((ConvertFrom-Adf $comment.body), '\s+', ' ').Trim()
         if ($body) {
-            if ($body.Length -gt 160) { $body = $body.Substring(0,157).TrimEnd() + "..." }
+            if ($body.Length -gt 160) { $body = $body.Substring(0, 157).TrimEnd() + '...' }
             $commentExcerpts += "${author}: $body"
         }
     }
     return [ordered]@{
-        key = if ($Issue.key) { $Issue.key } else { "UNKNOWN" }
-        title = if ($fields.summary) { $fields.summary } else { "No summary" }
-        status = if ($fields.status.name) { $fields.status.name } else { "Unknown" }
-        priority = if ($fields.priority.name) { $fields.priority.name } else { "Unknown" }
-        assignee = if ($fields.assignee.displayName) { $fields.assignee.displayName } else { "Unassigned" }
+        key = if ($Issue.key) { $Issue.key } else { 'UNKNOWN' }
+        title = if ($fields.summary) { $fields.summary } else { 'No summary' }
+        status = if ($fields.status.name) { $fields.status.name } else { 'Unknown' }
+        priority = if ($fields.priority.name) { $fields.priority.name } else { 'Unknown' }
+        assignee = if ($fields.assignee.displayName) { $fields.assignee.displayName } else { 'Unassigned' }
         description_text = $descriptionText
         comment_excerpts = $commentExcerpts
     }
@@ -88,7 +89,7 @@ function Get-JiraIssueSummary([object]$Issue) {
 
 function Tokenize([string]$Text) {
     $set = [System.Collections.Generic.HashSet[string]]::new()
-    foreach ($match in [regex]::Matches(($Text ?? "").ToLowerInvariant(), '[a-z0-9]+')) {
+    foreach ($match in [regex]::Matches(($Text ?? '').ToLowerInvariant(), '[a-z0-9]+')) {
         $token = $match.Value
         if ($token.Length -gt 2 -and -not ($Stopwords -contains $token) -and -not ($token -match '^\d+$')) {
             [void]$set.Add($token)
@@ -98,49 +99,37 @@ function Tokenize([string]$Text) {
 }
 
 function Test-IsTestFile([string]$Path) {
-    $normalized = $Path.Replace('\', '/')
-    return [bool]([regex]::IsMatch($normalized, '(^|/)(tests?|__tests__)/|(_test|_spec)\.|(\.test\.|\.spec\.)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
+    $normalized = $Path.Replace('\\', '/')
+    return [bool]([regex]::IsMatch($normalized, '(^|/)(tests?|__tests__|src/test)/|(_test|_spec)\.|(\.test\.|\.spec\.)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
 }
 
 function Test-IsDocFile([string]$Path) {
-    $normalized = $Path.Replace('\', '/').ToLowerInvariant()
+    $normalized = $Path.Replace('\\', '/').ToLowerInvariant()
     return ($DocExtensions -contains ([IO.Path]::GetExtension($Path).ToLowerInvariant())) -or $normalized.StartsWith('docs/') -or $normalized.StartsWith('doc/')
 }
 
 function Get-PatchExcerpt([string]$Patch) {
-    if ([string]::IsNullOrWhiteSpace($Patch)) { return "" }
+    if ([string]::IsNullOrWhiteSpace($Patch)) { return '' }
     $lines = New-Object System.Collections.Generic.List[string]
     foreach ($line in ($Patch -split "`r?`n")) {
         if ($line.StartsWith('+++') -or $line.StartsWith('---')) { continue }
         if ($line.StartsWith('@@') -or $line.StartsWith('+') -or $line.StartsWith('-')) {
             $lines.Add($line)
         }
-        if ($lines.Count -ge 16) { break }
+        if ($lines.Count -ge 20) { break }
     }
     $excerpt = ($lines -join "`n").Trim()
-    if ($excerpt.Length -gt 1400) { $excerpt = $excerpt.Substring(0, 1397).TrimEnd() + '...' }
+    if ($excerpt.Length -gt 1800) { $excerpt = $excerpt.Substring(0, 1797).TrimEnd() + '...' }
     return $excerpt
-}
-
-function Get-CodeFindings([hashtable]$FileEntry) {
-    $findings = @()
-    $filename = $FileEntry.filename
-    $patch = [string]$FileEntry.patch_excerpt
-    $lowered = $patch.ToLowerInvariant()
-    if ($lowered.Contains('todo')) { $findings += "${filename}: diff still contains a TODO marker, so the implementation may not be production-complete." }
-    if ($patch.Contains('except Exception')) { $findings += "${filename}: broad ``except Exception`` handling may hide failure causes and make retries harder to reason about." }
-    if ($patch -match 'def\s+\w+\([^)]*=\[\]') { $findings += "${filename}: mutable default list argument can leak state across calls." }
-    if ($lowered.Contains('logger.info') -and $lowered.Contains('token')) { $findings += "${filename}: logging token-related state deserves a quick review to avoid leaking sensitive request context." }
-    return $findings
 }
 
 function Get-CommentExcerpts([object[]]$Comments, [int]$Limit) {
     $items = @()
     foreach ($comment in @($Comments) | Select-Object -First $Limit) {
-        $author = if ($comment.PSObject.Properties.Name -contains 'user' -and $comment.user.PSObject.Properties.Name -contains 'login') { $comment.user.login } elseif ($comment.PSObject.Properties.Name -contains 'author' -and $comment.author.PSObject.Properties.Name -contains 'displayName') { $comment.author.displayName } else { "unknown" }
+        $author = if ($comment.PSObject.Properties.Name -contains 'user' -and $comment.user.PSObject.Properties.Name -contains 'login') { $comment.user.login } elseif ($comment.PSObject.Properties.Name -contains 'author' -and $comment.author.PSObject.Properties.Name -contains 'displayName') { $comment.author.displayName } else { 'unknown' }
         $body = [regex]::Replace(([string]$comment.body), '\s+', ' ').Trim()
         if ($body) {
-            if ($body.Length -gt 160) { $body = $body.Substring(0,157).TrimEnd() + '...' }
+            if ($body.Length -gt 160) { $body = $body.Substring(0, 157).TrimEnd() + '...' }
             $items += "${author}: $body"
         }
     }
@@ -159,23 +148,27 @@ function New-Finding([string]$Severity, [string]$Category, [string]$Title, [stri
     }
 }
 
+function New-CodeFinding([string]$Severity, [string]$Title, [string]$Details, [string]$SuggestedFix, [object[]]$EvidenceRefs) {
+    return New-Finding $Severity 'Code Quality' $Title $Details $SuggestedFix $EvidenceRefs
+}
 function Sort-Findings([object[]]$Findings) {
     return @($Findings | Sort-Object @{Expression={ $SeverityOrder[$_.severity] }}, @{Expression={ if ($CategoryOrder.ContainsKey($_.category)) { $CategoryOrder[$_.category] } else { 99 } }}, @{Expression={ $_.title }})
 }
-
-function Get-TestSuggestions([string[]]$Languages, [object[]]$CodeFiles, [object[]]$TestFiles, [string[]]$RiskyPaths) {
+function Get-TestSuggestions([string[]]$ReviewTargets, [object[]]$CodeFiles, [object[]]$TestFiles, [string[]]$RiskyPaths) {
     $items = [System.Collections.Generic.List[string]]::new()
     $seen = [System.Collections.Generic.HashSet[string]]::new()
     function Add-Item([string]$Value) {
         if ($Value -and $seen.Add($Value)) { [void]$items.Add($Value) }
     }
-    if ($CodeFiles.Count -gt 0 -and $TestFiles.Count -eq 0) { Add-Item 'Add targeted regression tests for the changed production paths because no test files changed.' }
-    if ($Languages -contains 'Python') { Add-Item 'Add Python coverage for changed branches, error handling, and repeated-call behavior visible in the diff.' }
-    if ($Languages -contains 'Java') { Add-Item 'Add Java coverage for changed branches, exception handling, and state transitions visible in the diff.' }
-    if (@($RiskyPaths | Where-Object { $_ -match 'payment|billing' }).Count -gt 0) { Add-Item 'Add an integration test covering duplicate events, retries, idempotency, and downstream side effects for payment-related paths.' }
-    if (@($RiskyPaths | Where-Object { $_ -match 'migration|sql|schema' }).Count -gt 0) { Add-Item 'Add a migration compatibility test covering existing rows, rollout, rollback, and read/write compatibility.' }
-    if (@($RiskyPaths | Where-Object { $_ -match 'auth|permission|security' }).Count -gt 0) { Add-Item 'Add authorization and negative-path tests proving unsafe callers are rejected.' }
-    if ($items.Count -eq 0 -and $CodeFiles.Count -gt 0) { Add-Item 'Add focused unit tests around changed methods plus one end-to-end regression covering the primary business flow.' }
+    if ($CodeFiles.Count -gt 0 -and $TestFiles.Count -eq 0) { Add-Item 'Add targeted regression tests for the changed production paths because no Java test files changed.' }
+    if ($ReviewTargets -contains 'java-source') { Add-Item 'Add Java regression coverage for exception handling, retry semantics, and state transitions touched in the diff.' }
+    if (@((@('spring-config', 'resource-config') | Where-Object { $ReviewTargets -contains $_ })).Count -gt 0) { Add-Item 'Add a Spring Boot integration test that boots the changed configuration and verifies property binding, retry, timeout, and security behavior.' }
+    if ($ReviewTargets -contains 'build-config') { Add-Item 'Add build verification that exercises the affected Maven or Gradle test and packaging configuration instead of trusting the file diff alone.' }
+    if ($ReviewTargets -contains 'logging-config') { Add-Item 'Add a logging regression test or snapshot proving sensitive fields stay masked and the intended logger level is preserved.' }
+    if (@(@($RiskyPaths | Where-Object { $_ -match 'payment|billing' })).Count -gt 0) { Add-Item 'Add an integration test covering duplicate events, retries, idempotency, and downstream side effects for the payment flow.' }
+    if (@(@($RiskyPaths | Where-Object { $_ -match 'migration|sql|schema' })).Count -gt 0) { Add-Item 'Add a migration compatibility test covering existing rows, rollout, rollback, and read-write compatibility.' }
+    if (@(@($RiskyPaths | Where-Object { $_ -match 'auth|permission|security' })).Count -gt 0) { Add-Item 'Add authorization and negative-path tests proving unsafe callers are rejected under the new Java and Spring configuration path.' }
+    if ($items.Count -eq 0 -and $CodeFiles.Count -gt 0) { Add-Item 'Add focused Java unit coverage plus one end-to-end regression around the primary business flow touched in the PR.' }
     return @($items | Select-Object -First 8)
 }
 
@@ -185,20 +178,26 @@ function Get-DiffEvidence([object[]]$Files) {
     $testFiles = @()
     $docFiles = @()
     $patchFiles = @()
-    $codeFindings = @()
+    $codeFindingObjects = @()
     $languages = [System.Collections.Generic.HashSet[string]]::new()
+    $reviewedTargets = [System.Collections.Generic.HashSet[string]]::new()
+    $supportedFiles = [System.Collections.Generic.List[string]]::new()
+    $metadataOnlyFiles = [System.Collections.Generic.List[string]]::new()
+    $registry = Get-JavaAnalyzerRegistry
     foreach ($item in @($Files)) {
         $filename = [string]$item.filename
-        $extension = [IO.Path]::GetExtension($filename).ToLowerInvariant()
-        $language = if ($LanguageByExtension.ContainsKey($extension)) { $LanguageByExtension[$extension] } else { "Unknown" }
-        if ($language -ne 'Unknown') { [void]$languages.Add($language) }
         $patchText = if ($item.PSObject.Properties.Name -contains 'patch') { [string]$item.patch } else { '' }
+        $reviewTarget = Get-JavaReviewTarget $filename
+        $language = Get-ReviewLanguage $reviewTarget
+        if ($language -ne 'Unknown') { [void]$languages.Add($language) }
         $entry = [ordered]@{
             filename = $filename
             status = if ($item.status) { $item.status } else { 'modified' }
             additions = [int]($item.additions ?? 0)
             deletions = [int]($item.deletions ?? 0)
             language = $language
+            review_target = $reviewTarget
+            is_supported_target = ($reviewTarget -ne 'unsupported')
             is_test = (Test-IsTestFile $filename)
             is_doc = (Test-IsDocFile $filename)
             has_patch = -not [string]::IsNullOrWhiteSpace($patchText)
@@ -208,14 +207,35 @@ function Get-DiffEvidence([object[]]$Files) {
         if ($entry.is_test) { $testFiles += $entry }
         elseif ($entry.is_doc) { $docFiles += $entry }
         else { $codeFiles += $entry }
-        if ($entry.has_patch) {
-            $patchFiles += $entry
-            $codeFindings += Get-CodeFindings $entry
+        if ($entry.has_patch) { $patchFiles += $entry }
+        if ($entry.is_supported_target) {
+            [void]$reviewedTargets.Add($reviewTarget)
+            [void]$supportedFiles.Add($filename)
+        } elseif (-not $entry.is_doc -and -not $entry.is_test) {
+            [void]$metadataOnlyFiles.Add($filename)
+        }
+        if ($entry.has_patch -and $entry.is_supported_target) {
+            $codeFindingObjects += Get-CommonExpertFindings $entry $patchText
+            if ($registry.Contains($reviewTarget)) {
+                $codeFindingObjects += & $registry[$reviewTarget] $entry $patchText
+            }
         }
     }
-    $codeEvidence = @()
     $languageList = @($languages | Sort-Object)
-    if ($languageList.Count -gt 0) { $codeEvidence += "Detected code languages in changed files: $($languageList -join ', ')." }
+    $reviewedTargetList = @($reviewedTargets | Sort-Object)
+    $codeEvidence = @(
+        "$CodeReviewReviewer ran diff-based review without AST or compiler support.",
+        "Current code review mode: $CodeReviewMode.",
+        "Supported Java review targets: $($CodeReviewSupportedTargets -join ', ')."
+    )
+    if ($supportedFiles.Count -gt 0) {
+        $codeEvidence += "Java ecosystem files eligible for expert review: $((@($supportedFiles | Select-Object -First 6)) -join ', ')."
+    } else {
+        $codeEvidence += 'No Java ecosystem files were eligible for expert diff review in this change set.'
+    }
+    if ($metadataOnlyFiles.Count -gt 0) {
+        $codeEvidence += "Files outside the Java expert boundary were treated as metadata-only: $((@($metadataOnlyFiles | Select-Object -First 5)) -join ', ')."
+    }
     if ($patchFiles.Count -gt 0) {
         $codeEvidence += "Inline patch excerpts are available for $($patchFiles.Count) file(s): $((@($patchFiles | Select-Object -First 4 | ForEach-Object { $_.filename })) -join ', ')."
     } else {
@@ -226,21 +246,24 @@ function Get-DiffEvidence([object[]]$Files) {
     if ($docFiles.Count -gt 0) { $codeEvidence += "Changed documentation files: $((@($docFiles | Select-Object -First 3 | ForEach-Object { $_.filename })) -join ', ')." }
     $positives = @()
     if ($testFiles.Count -gt 0) { $positives += "Test files changed: $((@($testFiles | Select-Object -First 3 | ForEach-Object { $_.filename })) -join ', ')." }
-    if ($docFiles.Count -gt 0) { $positives += "Documentation/runbook updates present: $((@($docFiles | Select-Object -First 2 | ForEach-Object { $_.filename })) -join ', ')." }
-    if ($patchFiles.Count -gt 0) { $positives += "Diff evidence captured patch excerpts for $($patchFiles.Count) file(s)." }
+    if ($docFiles.Count -gt 0) { $positives += "Documentation or runbook updates present: $((@($docFiles | Select-Object -First 2 | ForEach-Object { $_.filename })) -join ', ')." }
+    if ($supportedFiles.Count -gt 0) { $positives += "Java expert review covered $($supportedFiles.Count) Java ecosystem file(s)." }
     $questions = @()
-    foreach ($entry in @($patchFiles | Select-Object -First 3)) {
-        $questions += "What changed semantically in $($entry.filename) and how is it validated?"
+    foreach ($entry in @($patchFiles | Where-Object { $_.is_supported_target } | Select-Object -First 3)) {
+        $questions += "Which runtime behavior changed in $($entry.filename), and which Java or Spring regression test proves the new contract?"
     }
     return [ordered]@{
         languages = $languageList
+        reviewed_targets = $reviewedTargetList
+        supported_file_count = $supportedFiles.Count
         files = $evidenceFiles
         code_files = $codeFiles
         test_files = $testFiles
         doc_files = $docFiles
         patch_files = $patchFiles
         code_evidence = $codeEvidence
-        code_findings = $codeFindings
+        code_finding_objects = $codeFindingObjects
+        code_findings = @($codeFindingObjects | ForEach-Object { $_.details })
         positives = $positives
         questions = $questions
     }
@@ -277,6 +300,8 @@ function Get-EvidenceSources([string]$ReportPrUrl, [object]$Pull, [object[]]$Jir
             [ordered]@{
                 filename = $_.filename
                 language = $_.language
+                review_target = $_.review_target
+                is_supported_target = $_.is_supported_target
                 is_test = $_.is_test
                 is_doc = $_.is_doc
                 has_patch = $_.has_patch
@@ -284,67 +309,49 @@ function Get-EvidenceSources([string]$ReportPrUrl, [object]$Pull, [object[]]$Jir
         })
     }
 }
-
-function Build-StructuredFindings([string[]]$JiraKeys, [string[]]$AlignmentFindings, [string[]]$RiskFindings, [string[]]$CodeFindings, [string[]]$TestFindings, [string[]]$IssueCommentExcerpts, [string[]]$ReviewCommentExcerpts) {
+function Build-StructuredFindings([string[]]$JiraKeys, [string[]]$AlignmentFindings, [string[]]$RiskFindings, [object[]]$CodeFindingObjects, [string[]]$TestFindings, [string[]]$IssueCommentExcerpts, [string[]]$ReviewCommentExcerpts) {
     $findings = @()
     foreach ($message in $AlignmentFindings) {
         if ($message.StartsWith('No obvious')) { continue }
         if ($message -like 'No Jira key*') {
-            $findings += New-Finding 'high' 'Jira Alignment' 'PR is not traceable to a Jira issue' $message 'Add the Jira key to the PR title, body, branch name, or commits and verify the implementation scope matches that issue.' (@($JiraKeys))
+            $findings += New-Finding 'high' 'Jira Alignment' 'PR is not traceable to a Jira issue' $message 'Add the Jira key to the PR title, body, branch name, or commits and verify the Java implementation scope matches that issue.' (@($JiraKeys))
         } elseif ($message -like 'Multiple Jira keys*') {
-            $findings += New-Finding 'medium' 'Jira Alignment' 'Multiple Jira issues are linked to one PR' $message 'Confirm whether the PR intentionally spans multiple Jira issues; otherwise split the work or document the scope boundary.' (@($JiraKeys))
+            $findings += New-Finding 'medium' 'Jira Alignment' 'Multiple Jira issues are linked to one PR' $message 'Confirm whether the PR intentionally spans multiple Jira issues; otherwise split the work or document the Java service scope boundary.' (@($JiraKeys))
         } elseif ($message -like '*weak term overlap*') {
-            $findings += New-Finding 'medium' 'Jira Alignment' 'PR title and Jira intent look weakly aligned' $message 'Clarify the PR title and description so reviewers can map the implementation to the Jira intent without inference.' (@($JiraKeys))
+            $findings += New-Finding 'medium' 'Jira Alignment' 'PR title and Jira intent look weakly aligned' $message 'Clarify the PR title and description so reviewers can map the Java or Spring implementation to the Jira intent without inference.' (@($JiraKeys))
         } else {
-            $findings += New-Finding 'medium' 'Jira Alignment' 'Jira context is incomplete' $message 'Load or document the missing Jira context before approving the change.' (@($JiraKeys))
+            $findings += New-Finding 'medium' 'Jira Alignment' 'Jira context is incomplete' $message 'Load or document the missing Jira context before approving the Java service change.' (@($JiraKeys))
         }
     }
     foreach ($message in $RiskFindings) {
         if ($message.StartsWith('No obvious')) { continue }
         if ($message -like 'Large change set*') {
-            $findings += New-Finding 'medium' 'Implementation Risk' 'Large change set increases review surface' $message 'Break the PR into smaller units or add stronger reviewer guidance and focused regression coverage.' @($message)
+            $findings += New-Finding 'medium' 'Implementation Risk' 'Large change set increases review surface' $message 'Break the PR into smaller units or add stronger Java-focused reviewer guidance and regression coverage.' @($message)
         } elseif ($message -like 'Risky paths touched*') {
-            $findings += New-Finding 'high' 'Implementation Risk' 'High-risk production paths were modified' $message 'Add targeted validation for the risky paths and confirm rollout, rollback, and failure handling.' @($message)
+            $findings += New-Finding 'high' 'Implementation Risk' 'High-risk production paths were modified' $message 'Add targeted validation for the risky Java or Spring paths and confirm rollout, rollback, and failure handling.' @($message)
         } elseif ($message -like 'Production code changed without*') {
-            $findings += New-Finding 'high' 'Implementation Risk' 'Production code changed without matching tests' $message 'Add or update regression tests that exercise the changed production paths before merge.' @($message)
+            $findings += New-Finding 'high' 'Implementation Risk' 'Production code changed without matching tests' $message 'Add or update regression tests that exercise the changed Java production paths before merge.' @($message)
         } else {
-            $findings += New-Finding 'medium' 'Implementation Risk' 'PR carries implementation risk' $message 'Document the operational risk and add missing validation before approval.' @($message)
+            $findings += New-Finding 'medium' 'Implementation Risk' 'PR carries implementation risk' $message 'Document the operational risk and add missing validation before approving the Java service change.' @($message)
         }
     }
-    foreach ($message in $CodeFindings) {
-        $parts = $message -split ': ', 2
-        $prefix = $parts[0]
-        $detail = if ($parts.Count -gt 1) { $parts[1] } else { $message }
-        $severity = if ($message -match 'except Exception|mutable default') { 'high' } else { 'medium' }
-        if ($message -match 'except Exception') {
-            $fix = 'Catch the narrowest expected exception type and add logging or error propagation that preserves failure context.'
-        } elseif ($message -match 'mutable default') {
-            $fix = 'Replace the mutable default with None, then initialize the collection inside the function body.'
-        } elseif ($message -match 'TODO marker') {
-            $fix = 'Resolve the TODO before merge or convert it into a tracked follow-up issue with explicit scope and owner.'
-        } elseif ($message -match 'token-related') {
-            $fix = 'Review the log statement and avoid logging sensitive request context or tokens.'
-        } else {
-            $fix = 'Tighten the implementation and add a focused regression test for this code path.'
-        }
-        $findings += New-Finding $severity 'Code Quality' $detail $message $fix @($prefix)
-    }
+    $findings += @($CodeFindingObjects)
     foreach ($message in $TestFindings) {
         if ($message.StartsWith('Observed') -or $message.StartsWith('No executable')) { continue }
         if ($message.StartsWith('Code changed without')) {
-            $findings += New-Finding 'high' 'Test Gap' 'Test coverage is missing for changed implementation' $message 'Add tests that cover the modified production behavior before merging.' @($message)
+            $findings += New-Finding 'high' 'Test Gap' 'Test coverage is missing for changed implementation' $message 'Add tests that cover the modified Java or Spring behavior before merging.' @($message)
         } elseif ($message.StartsWith('Test Gap: ')) {
             $title = $message.Substring(10)
-            $findings += New-Finding 'medium' 'Test Gap' $title $message ("Implement: " + $title) @($message)
+            $findings += New-Finding 'medium' 'Test Gap' $title $message ('Implement: ' + $title) @($message)
         } else {
             $findings += New-Finding 'medium' 'Test Gap' $message $message 'Add the missing regression coverage described by this gap before approval.' @($message)
         }
     }
     foreach ($excerpt in @($ReviewCommentExcerpts | Select-Object -First 4)) {
-        $findings += New-Finding 'medium' 'Reviewer Concern' 'Reviewer raised an unresolved question' $excerpt 'Address the reviewer concern directly in code, tests, or PR discussion before approval.' @($excerpt)
+        $findings += New-Finding 'medium' 'Reviewer Concern' 'Reviewer raised an unresolved question' $excerpt 'Address the reviewer concern directly in Java or Spring code, tests, or PR discussion before approval.' @($excerpt)
     }
     foreach ($excerpt in @($IssueCommentExcerpts | Select-Object -First 2)) {
-        $findings += New-Finding 'medium' 'Reviewer Concern' 'Issue comment adds unresolved acceptance concern' $excerpt 'Close the acceptance concern explicitly in the PR description, code, or tests.' @($excerpt)
+        $findings += New-Finding 'medium' 'Reviewer Concern' 'Issue comment adds unresolved acceptance concern' $excerpt 'Close the acceptance concern explicitly in code, configuration, or tests.' @($excerpt)
     }
     $sorted = Sort-Findings $findings
     $summary = @($sorted | ForEach-Object {
@@ -373,6 +380,9 @@ function Render-Markdown([hashtable]$Report) {
         "- PR: $($Report.pr_url)",
         "- Mode: $($Report.mode_used)",
         "- Generated at: $($Report.generated_at)",
+        "- Reviewer: $($analysis.code_review_reviewer)",
+        "- Code review mode: $($analysis.code_review_mode) (diff-based, no AST/compiler)",
+        "- Supported targets: $((@($analysis.code_review_supported_targets) -join ', '))",
         "- Title: $($pull.title)",
         "- Author: $($pull.author)",
         ('- Branches: `{0}` -> `{1}`' -f $pull.head_ref, $pull.base_ref),
@@ -448,7 +458,7 @@ function Render-Markdown([hashtable]$Report) {
         foreach ($fileEntry in @($sources.files)) {
             $kind = if ($fileEntry.is_test) { 'test' } elseif ($fileEntry.is_doc) { 'doc' } else { 'code' }
             $patchStatus = if ($fileEntry.has_patch) { 'patch' } else { 'metadata-only' }
-            [void]$lines.Add("- $($fileEntry.filename) ($kind, $($fileEntry.language), $patchStatus)")
+            [void]$lines.Add("- $($fileEntry.filename) ($kind, $($fileEntry.language), $patchStatus, target: $($fileEntry.review_target))")
         }
     } else {
         [void]$lines.Add('- No changed files were captured.')
@@ -461,7 +471,6 @@ function Render-Markdown([hashtable]$Report) {
     foreach ($item in @($analysis.positives)) { [void]$lines.Add("- $item") }
     return (($lines -join "`n").Trim() + "`n")
 }
-
 function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$ResolvedPromptText) {
     $pull = $Bundle.pull
     $files = @($Bundle.files)
@@ -477,7 +486,11 @@ function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$Resolve
         }
     }
     $diff = Get-DiffEvidence $files
-    $riskyPaths = @($files | Where-Object { $path = [string]$_.filename; @($HighRiskPathHints | Where-Object { $path.ToLowerInvariant().Contains($_) }).Count -gt 0 } | ForEach-Object { $_.filename })
+    $riskyPaths = @($files | Where-Object {
+        $path = [string]$_.filename
+        $reviewTarget = Get-JavaReviewTarget $path
+        @(@($HighRiskPathHints | Where-Object { $path.ToLowerInvariant().Contains($_) })).Count -gt 0 -or $reviewTarget -in @('spring-config', 'build-config', 'logging-config')
+    } | ForEach-Object { $_.filename })
     $churn = [int]($pull.additions ?? 0) + [int]($pull.deletions ?? 0)
     $alignmentFindings = @()
     if ($jiraKeys.Count -eq 0) { $alignmentFindings += 'No Jira key was found in the PR title, branch name, body, or commit messages.' }
@@ -505,7 +518,7 @@ function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$Resolve
     if ($diff.code_files.Count -gt 0 -and $diff.test_files.Count -eq 0) { $testFindings += 'Code changed without any matching test file updates.' }
     elseif ($diff.test_files.Count -gt 0) { $testFindings += "Observed $($diff.test_files.Count) test file change(s) alongside the implementation." }
     else { $testFindings += 'No executable code changes were detected.' }
-    foreach ($suggestion in Get-TestSuggestions $diff.languages $diff.code_files $diff.test_files $riskyPaths) {
+    foreach ($suggestion in Get-JavaExpertTestSuggestions $diff.reviewed_targets $diff.code_files $diff.test_files $riskyPaths) {
         $testFindings += "Test Gap: $suggestion"
     }
     $issueCommentExcerpts = Get-CommentExcerpts $issueComments 6
@@ -515,7 +528,8 @@ function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$Resolve
     $recommendation = 'Approve with normal review'
     if ($jiraKeys.Count -eq 0 -or ($riskLevel -eq 'High' -and $diff.test_files.Count -eq 0)) { $recommendation = 'Request changes' }
     elseif ($riskLevel -in @('High', 'Medium') -or $alignmentFindings.Count -gt 0) { $recommendation = 'Needs clarification' }
-    $structured = Build-StructuredFindings $jiraKeys $alignmentFindings $riskFindings $(if ($diff.code_findings.Count -gt 0) { $diff.code_findings } else { @('No concrete inline code findings were detected automatically.') }) $testFindings $issueCommentExcerpts $reviewCommentExcerpts
+    $structured = Build-StructuredFindings $jiraKeys $alignmentFindings $riskFindings $diff.code_finding_objects $testFindings $issueCommentExcerpts $reviewCommentExcerpts
+    $fallbackCodeFinding = if ($diff.supported_file_count -eq 0) { 'No Java ecosystem files were eligible for expert diff review; non-Java files were only evaluated for metadata-level risk.' } else { 'No actionable Java expert diff findings were detected automatically.' }
     return [ordered]@{
         generated_at = [DateTime]::UtcNow.ToString('o')
         mode_used = $ResolvedMode
@@ -551,8 +565,11 @@ function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$Resolve
             alignment_findings = if ($alignmentFindings.Count -gt 0) { $alignmentFindings } else { @('No obvious Jira alignment gaps were detected from the available metadata.') }
             risk_level = $riskLevel
             risk_findings = $riskFindings
+            code_review_mode = $CodeReviewMode
+            code_review_reviewer = $CodeReviewReviewer
+            code_review_supported_targets = $CodeReviewSupportedTargets
             code_evidence = $diff.code_evidence
-            code_findings = if ($diff.code_findings.Count -gt 0) { $diff.code_findings } else { @('No concrete inline code findings were detected automatically.') }
+            code_findings = if ($diff.code_findings.Count -gt 0) { $diff.code_findings } else { @($fallbackCodeFinding) }
             test_findings = $testFindings
             open_questions = @($openQuestions | Select-Object -First 8)
             recommendation = $recommendation
@@ -587,17 +604,6 @@ try {
 } catch {
     Fail $_.Exception.Message
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

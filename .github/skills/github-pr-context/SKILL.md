@@ -7,16 +7,10 @@ description: Fetch and normalize GitHub pull request context as JSON, including 
 
 Use this skill when only the GitHub PR evidence is needed.
 
-Use the script that matches the user's system:
+Use the PowerShell script:
 
 ```powershell
 .github/skills/github-pr-context/scripts/github_pr_context.ps1 -PrUrl "<pr-url>" -Mode auto
 ```
-
-```bash
-.github/skills/github-pr-context/scripts/github_pr_context.sh --pr-url "<pr-url>" --mode auto
-```
-
-Bash mode expects `node` and `curl` to be available.
 
 Return the JSON bundle. Do not write the final review in this skill.

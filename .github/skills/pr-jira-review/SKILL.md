@@ -1,11 +1,11 @@
 ---
 name: pr-jira-review
-description: Orchestrate GitHub PR review against Jira context using reusable local skills for GitHub context, Jira context, review writing, editable Markdown drafts, and managed PR comment publishing. Use when the user gives a GitHub PR URL, asks for Jira alignment, implementation risk, missing tests, evidence-backed PR audit, wants the review saved as an editable draft, or wants subagent-friendly parallel review coordination before optionally publishing the review back to the PR.
+description: Orchestrate PR review against Jira context using reusable local skills for GitHub context, Jira context, review writing, editable Markdown drafts, and managed PR comment publishing. The current expert implementation is Java and Spring focused while the public entrypoint remains stable.
 ---
 
 # PR Jira Review
 
-Use this as the single entrypoint skill. Keep the user experience simple: one prompt in, one review draft out.
+Use this as the single entrypoint skill. Keep the user experience simple: one prompt in, one expert review draft out.
 
 ## Core flow
 
@@ -17,20 +17,14 @@ Use this as the single entrypoint skill. Keep the user experience simple: one pr
 3. Decide whether subagents should be used.
 4. Gather GitHub context.
 5. Gather Jira context.
-6. Generate the review report and Markdown draft.
+6. Generate the expert review report and Markdown draft.
 7. If the user asks to publish, publish or update the managed PR comment.
 
-Run the orchestrator first with the script that matches the user's system:
+Run the orchestrator first with the PowerShell script:
 
 ```powershell
 .github/skills/pr-jira-review/scripts/review_pr.ps1 -PrUrl "<pr-url>" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
 ```
-
-```bash
-.github/skills/pr-jira-review/scripts/review_pr.sh --pr-url "<pr-url>" --mode auto --output json --draft-path "pr-review-drafts/pr-<number>-review.md"
-```
-
-Bash mode expects `node` and `curl` to be available.
 
 Read these fields from the JSON result:
 
@@ -40,6 +34,14 @@ Read these fields from the JSON result:
 - `orchestration`
 - `draft`
 - `publish_target`
+
+## Review boundary
+
+Current active expert reviewer: `Senior Java/Spring Reviewer`.
+Current code review mode: `java-expert-diff`.
+The code-level review is limited to Java ecosystem files, including `.java`, Spring configuration, runtime resource config, `pom.xml` or Gradle build files, and logging configuration.
+The public entrypoint remains generic, while the Java expert implementation is highlighted under `scripts/analyzers/java/` and reused by the writer entrypoint.
+The review is diff-based only and does not use AST, compiler, or external Java toolchains.
 
 ## Subagent policy
 
@@ -54,7 +56,7 @@ When subagents are warranted, split work like this:
 
 - `Agent A`: GitHub Context Worker
 - `Agent B`: Jira Context Worker
-- `Agent C`: Review Analysis Worker
+- `Agent C`: Java Expert Review Worker
 - Main agent: integrate evidence, finalize Markdown, decide whether to publish
 
 Do not duplicate work between agents. A and B run in parallel. C starts only after A and B finish.
@@ -75,7 +77,7 @@ Prefer the main skill unless the user explicitly wants one stage only.
 Keep the review evidence-backed and ordered by business risk:
 
 1. Jira alignment
-2. implementation and correctness risk
+2. Java or Spring implementation and correctness risk
 3. missing or weak tests
 4. unresolved reviewer questions
 
@@ -94,8 +96,4 @@ Publish command:
 
 ```powershell
 .github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "<pr-url>" -DraftPath "pr-review-drafts\pr-<number>-review.md" -Mode real
-```
-
-```bash
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.sh --pr-url "<pr-url>" --input "pr-review-drafts/pr-<number>-review.md" --mode real
 ```
