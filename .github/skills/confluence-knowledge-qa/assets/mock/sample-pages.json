@@ -1,0 +1,56 @@
+{
+  "pages": [
+    {
+      "url": "https://abc.com/confluence/pages/viewpage.action?pageId=1001",
+      "content": {
+        "id": "1001",
+        "title": "Platform Runbook",
+        "version": {
+          "number": 7
+        },
+        "space": {
+          "key": "ENG"
+        },
+        "ancestors": [
+          {
+            "title": "Engineering"
+          },
+          {
+            "title": "Operations"
+          }
+        ],
+        "body": {
+          "storage": {
+            "value": "<h1>Service Overview</h1><p>The platform API uses canary deployment for production rollouts.</p><h2>On-call</h2><ul><li>Primary escalation: Platform SRE</li><li>Slack channel: #platform-help</li></ul><h2>Release checks</h2><table><tr><th>Check</th><th>Owner</th></tr><tr><td>Smoke tests</td><td>QA</td></tr><tr><td>Error budget</td><td>SRE</td></tr></table>"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://abc.com/confluence/display/ENG/Incident+Guide?pageId=1002",
+      "content": {
+        "id": "1002",
+        "title": "Incident Guide",
+        "version": {
+          "number": 3
+        },
+        "space": {
+          "key": "ENG"
+        },
+        "ancestors": [
+          {
+            "title": "Engineering"
+          },
+          {
+            "title": "Reliability"
+          }
+        ],
+        "body": {
+          "storage": {
+            "value": "<h1>Severity model</h1><p>SEV-1 incidents require commander assignment within 5 minutes.</p><h2>Communication</h2><p>Post updates every 15 minutes in the incident channel.</p><h2>Escalation matrix</h2><ol><li>Notify the commander</li><li>Page the owning team</li></ol>"
+          }
+        }
+      }
+    }
+  ]
+}

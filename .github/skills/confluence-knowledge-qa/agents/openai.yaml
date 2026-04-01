@@ -1,0 +1,4 @@
+interface:
+  display_name: "Confluence Knowledge QA"
+  short_description: "Answer session questions from Confluence page context"
+  default_prompt: "Use $confluence-knowledge-qa to load these Confluence pages into the current session context and answer my question from them."
