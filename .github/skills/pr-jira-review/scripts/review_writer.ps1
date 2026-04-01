@@ -23,8 +23,20 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function ConvertFrom-JsonCompat([string]$Json) {
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return $Json | ConvertFrom-Json -Depth 100
+    }
+    return $Json | ConvertFrom-Json
+}
+
+function Get-ValueOrDefault([object]$Value, [object]$Default) {
+    if ($null -eq $Value) { return $Default }
+    return $Value
+}
+
 function Get-Json([string]$Path) {
-    return Get-Content -Raw -Encoding UTF8 $Path | ConvertFrom-Json -Depth 100
+    return ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
 }
 
 function Write-TextFile([string]$Path, [string]$Content) {
@@ -89,7 +101,7 @@ function Get-JiraIssueSummary([object]$Issue) {
 
 function Tokenize([string]$Text) {
     $set = [System.Collections.Generic.HashSet[string]]::new()
-    foreach ($match in [regex]::Matches(($Text ?? '').ToLowerInvariant(), '[a-z0-9]+')) {
+    foreach ($match in [regex]::Matches(([string](Get-ValueOrDefault $Text '')).ToLowerInvariant(), '[a-z0-9]+')) {
         $token = $match.Value
         if ($token.Length -gt 2 -and -not ($Stopwords -contains $token) -and -not ($token -match '^\d+$')) {
             [void]$set.Add($token)
@@ -193,8 +205,8 @@ function Get-DiffEvidence([object[]]$Files) {
         $entry = [ordered]@{
             filename = $filename
             status = if ($item.status) { $item.status } else { 'modified' }
-            additions = [int]($item.additions ?? 0)
-            deletions = [int]($item.deletions ?? 0)
+            additions = [int](Get-ValueOrDefault $item.additions 0)
+            deletions = [int](Get-ValueOrDefault $item.deletions 0)
             language = $language
             review_target = $reviewTarget
             is_supported_target = ($reviewTarget -ne 'unsupported')
@@ -277,8 +289,8 @@ function Get-EvidenceSources([string]$ReportPrUrl, [object]$Pull, [object[]]$Jir
             author = if ($Pull.PSObject.Properties.Name -contains 'user' -and $Pull.user.PSObject.Properties.Name -contains 'login') { $Pull.user.login } else { 'unknown' }
             head_ref = if ($Pull.head.ref) { $Pull.head.ref } else { '' }
             base_ref = if ($Pull.base.ref) { $Pull.base.ref } else { '' }
-            changed_files = if ($DiffEvidence.files.Count -gt 0) { $DiffEvidence.files.Count } else { [int]($Pull.changed_files ?? 0) }
-            churn = [int]($Pull.additions ?? 0) + [int]($Pull.deletions ?? 0)
+            changed_files = if ($DiffEvidence.files.Count -gt 0) { $DiffEvidence.files.Count } else { [int](Get-ValueOrDefault $Pull.changed_files 0) }
+            churn = [int](Get-ValueOrDefault $Pull.additions 0) + [int](Get-ValueOrDefault $Pull.deletions 0)
         }
         jira = @($JiraIssues | ForEach-Object {
             [ordered]@{
@@ -491,7 +503,7 @@ function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$Resolve
         $reviewTarget = Get-JavaReviewTarget $path
         @(@($HighRiskPathHints | Where-Object { $path.ToLowerInvariant().Contains($_) })).Count -gt 0 -or $reviewTarget -in @('spring-config', 'build-config', 'logging-config')
     } | ForEach-Object { $_.filename })
-    $churn = [int]($pull.additions ?? 0) + [int]($pull.deletions ?? 0)
+    $churn = [int](Get-ValueOrDefault $pull.additions 0) + [int](Get-ValueOrDefault $pull.deletions 0)
     $alignmentFindings = @()
     if ($jiraKeys.Count -eq 0) { $alignmentFindings += 'No Jira key was found in the PR title, branch name, body, or commit messages.' }
     elseif ($jiraKeys.Count -gt 1) { $alignmentFindings += "Multiple Jira keys were detected: $($jiraKeys -join ', ')." }
@@ -543,9 +555,9 @@ function Analyze-Bundle([object]$Bundle, [string]$ResolvedMode, [string]$Resolve
             draft = [bool]$pull.draft
             head_ref = if ($pull.head.ref) { $pull.head.ref } else { '' }
             base_ref = if ($pull.base.ref) { $pull.base.ref } else { '' }
-            changed_files = if ($files.Count -gt 0) { $files.Count } else { [int]($pull.changed_files ?? 0) }
-            additions = [int]($pull.additions ?? 0)
-            deletions = [int]($pull.deletions ?? 0)
+            changed_files = if ($files.Count -gt 0) { $files.Count } else { [int](Get-ValueOrDefault $pull.changed_files 0) }
+            additions = [int](Get-ValueOrDefault $pull.additions 0)
+            deletions = [int](Get-ValueOrDefault $pull.deletions 0)
             churn = $churn
             sample_files = @($files | Select-Object -First 5 | ForEach-Object { $_.filename })
             commit_count = $commits.Count

@@ -7,10 +7,11 @@ description: Publish or update a managed GitHub PR issue comment from an editabl
 
 Use this skill only for the publish stage.
 
-Use the PowerShell script:
+These scripts target Windows PowerShell 5.1 compatibility first and continue to work in PowerShell 7.
+Use the PowerShell script directly from the current host:
 
 ```powershell
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "<pr-url>" -DraftPath "<draft.md>" -Mode real
+& .\.github\skills\pr-review-publisher\scripts\pr_review_publisher.ps1 -PrUrl "<pr-url>" -DraftPath "<draft.md>" -Mode real
 ```
 
 The publisher maintains one managed PR issue comment marked with a stable HTML comment and updates that comment on later publishes.

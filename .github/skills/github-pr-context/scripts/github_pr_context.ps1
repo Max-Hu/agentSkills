@@ -14,6 +14,13 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function ConvertFrom-JsonCompat([string]$Json) {
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return $Json | ConvertFrom-Json -Depth 100
+    }
+    return $Json | ConvertFrom-Json
+}
+
 function Get-DefaultMockDataPath {
     return Join-Path $PSScriptRoot "..\..\pr-jira-review\assets\mock\default-review-bundle.json"
 }
@@ -79,7 +86,7 @@ function Invoke-JsonGet([string]$Url, [hashtable]$Headers) {
 }
 
 function Load-MockBundle([string]$Path) {
-    $raw = Get-Content -Raw -Encoding UTF8 $Path | ConvertFrom-Json -Depth 100
+    $raw = ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
     return @{
         pr_url = $raw.pr_url
         pull = $raw.pull

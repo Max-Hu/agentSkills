@@ -18,6 +18,18 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function ConvertFrom-JsonCompat([string]$Json) {
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return $Json | ConvertFrom-Json -Depth 100
+    }
+    return $Json | ConvertFrom-Json
+}
+
+function Get-ValueOrDefault([object]$Value, [object]$Default) {
+    if ($null -eq $Value) { return $Default }
+    return $Value
+}
+
 function Get-DefaultMockDataPath {
     return Join-Path $PSScriptRoot "..\assets\mock\default-review-bundle.json"
 }
@@ -60,7 +72,7 @@ function Invoke-JsonGet([string]$Url, [hashtable]$Headers) {
 }
 
 function Load-MockBundle([string]$Path) {
-    return Get-Content -Raw -Encoding UTF8 $Path | ConvertFrom-Json -Depth 100
+    return ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
 }
 
 function Get-JiraKeys([object]$Bundle) {
@@ -115,8 +127,8 @@ function Fetch-JiraIssues([string[]]$Keys) {
 
 function Get-Orchestration([string]$RequestedMode, [string]$ModeUsed, [string]$ResolvedPromptText, [object]$Pull, [string[]]$JiraKeys) {
     $reasons = @()
-    $changedFiles = [int]($Pull.changed_files ?? 0)
-    $churn = [int]($Pull.churn ?? ([int]($Pull.additions ?? 0) + [int]($Pull.deletions ?? 0)))
+    $changedFiles = [int](Get-ValueOrDefault $Pull.changed_files 0)
+    $churn = [int](Get-ValueOrDefault $Pull.churn (([int](Get-ValueOrDefault $Pull.additions 0)) + ([int](Get-ValueOrDefault $Pull.deletions 0))))
     if ($RequestedMode -in @('real', 'auto')) { $reasons += 'Live or live-capable mode benefits from parallel context gathering.' }
     if ($changedFiles -gt 15 -or $churn -ge 600) { $reasons += 'Large PR size crosses the threshold for parallel analysis.' }
     if ($JiraKeys.Count -gt 1) { $reasons += 'Multiple Jira keys were detected and can be investigated independently.' }
@@ -171,7 +183,7 @@ try {
         if ($DraftPath) { $writerParams.DraftPath = $DraftPath }
         if ($modeUsed) { $writerParams.ModeUsed = $modeUsed }
         if ($PromptText) { $writerParams.PromptText = $PromptText }
-        $report = (& $writerPath @writerParams | Out-String) | ConvertFrom-Json -Depth 100
+        $report = ConvertFrom-JsonCompat ((& $writerPath @writerParams | Out-String))
         $report | Add-Member -NotePropertyName orchestration -NotePropertyValue (Get-Orchestration $Mode $modeUsed $PromptText $report.pull @($report.jira_keys)) -Force
         $report | Add-Member -NotePropertyName publish_target -NotePropertyValue @{ pr_url = $report.pr_url; managed_marker = $ManagedMarker } -Force
         if ($OutputFormat -eq 'json') {

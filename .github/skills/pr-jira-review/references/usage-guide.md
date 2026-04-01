@@ -22,7 +22,12 @@ The public skill entrypoints remain generic.
 The current active expert reviewer is `Senior Java/Spring Reviewer` in `java-expert-diff` mode.
 The Java expert implementation is highlighted under `scripts/analyzers/java/`, and the orchestrator reuses that Java analyzer path through the writer entrypoint.
 
-## 3. Default Usage
+## 3. PowerShell Compatibility
+
+These scripts target Windows PowerShell 5.1 compatibility first and continue to work in PowerShell 7.
+Examples below invoke the `.ps1` files directly so the current PowerShell host controls execution without requiring a specific executable name.
+
+## 4. Default Usage
 
 For normal usage, call only the orchestrator:
 
@@ -39,12 +44,12 @@ The orchestrator should:
 - write an editable Markdown draft
 - expose the publish target for later comment publishing
 
-## 4. Orchestrator Command
+## 5. Orchestrator Command
 
 PowerShell:
 
 ```powershell
-.github/skills/pr-jira-review/scripts/review_pr.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
+& .\.github\skills\pr-jira-review\scripts\review_pr.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
 ```
 
 The JSON output includes:
@@ -56,24 +61,24 @@ The JSON output includes:
 - `draft`
 - `publish_target`
 
-## 5. Capability Commands
+## 6. Capability Commands
 
 GitHub context only:
 
 ```powershell
-.github/skills/github-pr-context/scripts/github_pr_context.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto
+& .\.github\skills\github-pr-context\scripts\github_pr_context.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -Mode auto
 ```
 
 Jira context only:
 
 ```powershell
-.github/skills/jira-issue-context/scripts/jira_issue_context.ps1 -InputPath "github-bundle.json" -Mode auto
+& .\.github\skills\jira-issue-context\scripts\jira_issue_context.ps1 -InputPath "github-bundle.json" -Mode auto
 ```
 
 Write review from an existing combined bundle:
 
 ```powershell
-.github/skills/pr-review-writer/scripts/pr_review_writer.ps1 -InputPath "combined-bundle.json" -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
+& .\.github\skills\pr-review-writer\scripts\pr_review_writer.ps1 -InputPath "combined-bundle.json" -OutputFormat json -DraftPath "pr-review-drafts\pr-123-review.md"
 ```
 
 Current Java expert module path:
@@ -85,10 +90,10 @@ Current Java expert module path:
 Publish or update the managed PR comment:
 
 ```powershell
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -DraftPath "pr-review-drafts\pr-123-review.md" -Mode real
+& .\.github\skills\pr-review-publisher\scripts\pr_review_publisher.ps1 -PrUrl "https://github.com/acme/payments-service/pull/123" -DraftPath "pr-review-drafts\pr-123-review.md" -Mode real
 ```
 
-## 6. Subagent Guidance
+## 7. Subagent Guidance
 
 The orchestrator should prefer local execution unless at least one of these is true:
 
@@ -104,10 +109,10 @@ Recommended split:
 - `Agent C`: Java Expert Review Worker
 - main agent: integration, final draft, publish decision
 
-## 7. Verification Commands
+## 8. Verification Commands
 
 PowerShell smoke path:
 
 ```powershell
-.github/skills/pr-jira-review/scripts/tests/smoke_review_skill.ps1
+& .\.github\skills\pr-jira-review\scripts\tests\smoke_review_skill.ps1
 ```

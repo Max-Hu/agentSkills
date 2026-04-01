@@ -13,6 +13,13 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function ConvertFrom-JsonCompat([string]$Json) {
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return $Json | ConvertFrom-Json -Depth 100
+    }
+    return $Json | ConvertFrom-Json
+}
+
 function Get-DefaultMockDataPath {
     return Join-Path $PSScriptRoot "..\..\pr-jira-review\assets\mock\default-review-bundle.json"
 }
@@ -62,7 +69,7 @@ function Invoke-JsonGet([string]$Url, [hashtable]$Headers) {
 }
 
 function Load-MockBundle([string]$Path, [string[]]$Keys) {
-    $raw = Get-Content -Raw -Encoding UTF8 $Path | ConvertFrom-Json -Depth 100
+    $raw = ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
     $allIssues = $raw.jira_issues
     $selected = [ordered]@{}
     if ($Keys.Count -eq 0) {
@@ -103,7 +110,7 @@ try {
         throw "Provide -InputPath with a GitHub bundle JSON file."
     }
     $resolvedMock = if ($MockData) { $MockData } else { Get-DefaultMockDataPath }
-    $bundle = Get-Content -Raw -Encoding UTF8 $InputPath | ConvertFrom-Json -Depth 100
+    $bundle = ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $InputPath)
     $keys = @(Get-JiraKeys $bundle)
 
     if ($Mode -eq "mock") {

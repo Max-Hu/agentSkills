@@ -1,16 +1,17 @@
 ---
 name: github-pr-context
-description: Fetch and normalize GitHub pull request context as JSON, including PR metadata, changed files, commits, issue comments, and review comments. Use when the user only wants the GitHub evidence stage, wants to inspect the raw PR bundle, or when a larger review workflow needs a dedicated GitHub context worker.
+description: Fetch GitHub PR metadata, changed files, commits, and comments as a reusable review context bundle. Use when the user wants GitHub context only, wants to inspect PR metadata before review writing, or needs a standalone capability step inside the larger PR review workflow.
 ---
 
 # GitHub PR Context
 
-Use this skill when only the GitHub PR evidence is needed.
+Use this skill only for the GitHub context stage.
 
-Use the PowerShell script:
+These scripts target Windows PowerShell 5.1 compatibility first and continue to work in PowerShell 7.
+Use the PowerShell script directly from the current host:
 
 ```powershell
-.github/skills/github-pr-context/scripts/github_pr_context.ps1 -PrUrl "<pr-url>" -Mode auto
+& .\.github\skills\github-pr-context\scripts\github_pr_context.ps1 -PrUrl "<pr-url>" -Mode auto
 ```
 
-Return the JSON bundle. Do not write the final review in this skill.
+The output is a JSON bundle containing `pr_url`, `pull`, `files`, `commits`, `issue_comments`, and `review_comments`.

@@ -7,10 +7,11 @@ description: Turn a combined GitHub and Jira evidence bundle into a structured r
 
 Use this skill when the evidence bundle already exists and the remaining task is review analysis plus draft generation.
 
-Use the PowerShell script:
+These scripts target Windows PowerShell 5.1 compatibility first and continue to work in PowerShell 7.
+Use the PowerShell script directly from the current host:
 
 ```powershell
-.github/skills/pr-review-writer/scripts/pr_review_writer.ps1 -InputPath "<combined-bundle.json>" -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
+& .\.github\skills\pr-review-writer\scripts\pr_review_writer.ps1 -InputPath "<combined-bundle.json>" -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
 ```
 
 Current active expert reviewer: `Senior Java/Spring Reviewer`.

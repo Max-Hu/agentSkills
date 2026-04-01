@@ -14,6 +14,11 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function Get-ValueOrDefault([object]$Value, [object]$Default) {
+    if ($null -eq $Value) { return $Default }
+    return $Value
+}
+
 function Parse-PrUrl([string]$Url) {
     try {
         $uri = [Uri]$Url
@@ -87,7 +92,7 @@ try {
     if ($existing) {
         $updated = Invoke-GitHubJson "$base/repos/$($prRef.Owner)/$($prRef.Repo)/issues/comments/$($existing.id)" 'PATCH' @{ body = $managedBody }
         [ordered]@{
-            comment_id = [int]($updated.id ?? $existing.id)
+            comment_id = [int](Get-ValueOrDefault $updated.id $existing.id)
             comment_url = if ($updated.html_url) { $updated.html_url } else { $existing.html_url }
             action = 'updated'
             marker_found = $true

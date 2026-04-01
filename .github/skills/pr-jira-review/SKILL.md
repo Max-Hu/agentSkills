@@ -7,6 +7,9 @@ description: Orchestrate PR review against Jira context using reusable local ski
 
 Use this as the single entrypoint skill. Keep the user experience simple: one prompt in, one expert review draft out.
 
+These scripts target Windows PowerShell 5.1 compatibility first and continue to work in PowerShell 7.
+Run the `.ps1` entrypoints directly from the current PowerShell host instead of assuming a specific executable name.
+
 ## Core flow
 
 1. Extract the PR URL from the request.
@@ -23,7 +26,7 @@ Use this as the single entrypoint skill. Keep the user experience simple: one pr
 Run the orchestrator first with the PowerShell script:
 
 ```powershell
-.github/skills/pr-jira-review/scripts/review_pr.ps1 -PrUrl "<pr-url>" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
+& .\.github\skills\pr-jira-review\scripts\review_pr.ps1 -PrUrl "<pr-url>" -Mode auto -OutputFormat json -DraftPath "pr-review-drafts\pr-<number>-review.md"
 ```
 
 Read these fields from the JSON result:
@@ -95,5 +98,5 @@ Default output is an editable Markdown draft on disk.
 Publish command:
 
 ```powershell
-.github/skills/pr-review-publisher/scripts/pr_review_publisher.ps1 -PrUrl "<pr-url>" -DraftPath "pr-review-drafts\pr-<number>-review.md" -Mode real
+& .\.github\skills\pr-review-publisher\scripts\pr_review_publisher.ps1 -PrUrl "<pr-url>" -DraftPath "pr-review-drafts\pr-<number>-review.md" -Mode real
 ```
