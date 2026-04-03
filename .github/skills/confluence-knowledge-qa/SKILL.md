@@ -51,6 +51,41 @@ https://abc.com/confluence/rest/api
 
 Use basic authentication with `CONFLUENCE_USERNAME` and `CONFLUENCE_PASSWORD`. For Confluence Cloud, `CONFLUENCE_PASSWORD` can hold an API token.
 
+## VS Code Chat usage
+
+Use the public skill name in chat and let the skill manage session state.
+
+Typical prompts:
+
+```text
+Use $confluence-knowledge-qa to load this page and summarize the deployment steps:
+https://abc.com/confluence/pages/viewpage.action?pageId=1001
+```
+
+```text
+Use $confluence-knowledge-qa to load these pages and answer: what changed in the incident process?
+https://abc.com/confluence/pages/viewpage.action?pageId=1001
+https://abc.com/confluence/display/ENG/Incident+Guide?pageId=1002
+```
+
+```text
+Use $confluence-knowledge-qa to add this page to the current Confluence context and answer whether it changes the rollback policy:
+https://abc.com/confluence/pages/viewpage.action?pageId=1003
+```
+
+```text
+Use $confluence-knowledge-qa to refresh the current Confluence context and answer the same question again.
+```
+
+```text
+Use $confluence-knowledge-qa to replace the current Confluence context with this page only:
+https://abc.com/confluence/pages/viewpage.action?pageId=1002
+```
+
+```text
+Use $confluence-knowledge-qa to clear the current Confluence context.
+```
+
 ## Output bundle
 
 Read these fields from the JSON result:
