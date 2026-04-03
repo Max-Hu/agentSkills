@@ -1,0 +1,113 @@
+{
+  "changes": [
+    {
+      "id": "9001",
+      "response": {
+        "id": 9001,
+        "changeNumber": "CHG-9001",
+        "title": "Database failover rehearsal",
+        "status": "Implemented",
+        "service": "payments",
+        "risk": "medium",
+        "ownerTeam": "Platform DB",
+        "plannedStart": "2026-03-01T10:00:00Z",
+        "plannedEnd": "2026-03-01T12:00:00Z",
+        "description": "Exercise the automated failover flow in staging before the production rollout.",
+        "implementationPlan": [
+          "Drain background workers",
+          "Trigger primary failover",
+          "Validate application reconnection"
+        ]
+      }
+    },
+    {
+      "id": "9002",
+      "response": {
+        "id": 9002,
+        "changeNumber": "CHG-9002",
+        "title": "Rotate edge certificates",
+        "status": "Scheduled",
+        "service": "api-gateway",
+        "risk": "low",
+        "ownerTeam": "Traffic",
+        "plannedStart": "2026-03-05T02:00:00Z",
+        "plannedEnd": "2026-03-05T03:00:00Z",
+        "description": "Renew wildcard certificates ahead of expiry and validate all ingress listeners."
+      }
+    },
+    {
+      "id": "9003",
+      "response": {
+        "id": 9003,
+        "changeNumber": "CHG-9003",
+        "title": "Move audit export job",
+        "status": "In Review",
+        "service": "audit-pipeline",
+        "risk": "high",
+        "ownerTeam": "Compliance",
+        "plannedStart": "2026-03-07T07:30:00Z",
+        "plannedEnd": "2026-03-07T09:00:00Z",
+        "description": "Repoint export job to the dedicated analytics cluster."
+      }
+    }
+  ],
+  "updates": [
+    {
+      "changeId": "9001",
+      "response": {
+        "count": 2,
+        "results": [
+          {
+            "updateID": "UP-1001",
+            "timestamp": "2026-03-01T09:00:00Z",
+            "status": "Planned",
+            "comment": "CAB approved for the rehearsal window.",
+            "updaterApiUserID": "u-501"
+          },
+          {
+            "updateID": "UP-1002",
+            "timestamp": "2026-03-01T12:10:00Z",
+            "status": "Implemented",
+            "comment": "Failover completed and validation checks passed.",
+            "updaterApiUserID": "u-502"
+          }
+        ]
+      }
+    },
+    {
+      "changeId": "9002",
+      "response": {
+        "count": 1,
+        "results": [
+          {
+            "updateID": "UP-2001",
+            "timestamp": "2026-03-04T18:00:00Z",
+            "status": "Scheduled",
+            "comment": "Waiting for final maintenance approval.",
+            "updaterApiUserID": "u-999"
+          }
+        ]
+      }
+    },
+    {
+      "changeId": "9003",
+      "error": "Simulated updates service outage for change 9003."
+    }
+  ],
+  "apiUsers": [
+    {
+      "apiUserID": "u-501",
+      "response": {
+        "apiUserID": "u-501",
+        "displayName": "Alice Chen"
+      }
+    },
+    {
+      "apiUserID": "u-502",
+      "response": {
+        "apiUserID": "u-502",
+        "displayName": "Bob Li"
+      }
+    }
+  ]
+}

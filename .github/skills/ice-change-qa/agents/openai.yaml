@@ -1,0 +1,4 @@
+interface:
+  display_name: "ICE Change QA"
+  short_description: "Answer session questions from ICE change context, with updates only on explicit request"
+  default_prompt: "Use $ice-change-qa to load these ICE change IDs into the current session context and answer my question from them."
