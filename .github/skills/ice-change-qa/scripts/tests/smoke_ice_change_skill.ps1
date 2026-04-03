@@ -35,10 +35,15 @@ if ($null -eq $change9002WithUpdates.updates) { throw "Expected updates when exp
 if ($change9002WithUpdates.resolved_updaters.PSObject.Properties['u-999'].Value -ne 'u-999') { throw "Expected unresolved updater fallback for u-999." }
 if ($withUpdates.warnings.Count -lt 1) { throw "Expected a warning for unresolved updater fallback." }
 
+$alpha = ConvertFrom-JsonCompat ((& $scriptPath -Ids CHG-ALPHA-7 -Mode mock -MergeMode replace -CacheRoot $cacheRoot | Out-String))
+if ($alpha.change_count -ne 1) { throw "Expected non-numeric change ID to load." }
+if ([string]$alpha.changes[0].id -ne 'CHG-ALPHA-7') { throw "Expected non-numeric change ID to round-trip." }
+if ($null -ne $alpha.changes[0].updates) { throw "Expected no updates for non-numeric ID without explicit request." }
+
 $reused = ConvertFrom-JsonCompat ((& $scriptPath -PromptText "Answer from the current loaded changes" -Mode mock -CacheRoot $cacheRoot | Out-String))
-if ($reused.change_count -ne 2) { throw "Expected change_count 2 for manifest reuse." }
-$reused9002 = @($reused.changes | Where-Object { [string]$_.id -eq '9002' })[0]
-if ($null -ne $reused9002.updates) { throw "Expected updates to stay hidden on plain reuse." }
+if ($reused.change_count -ne 1) { throw "Expected change_count 1 for manifest reuse after replace." }
+if ([string]$reused.changes[0].id -ne 'CHG-ALPHA-7') { throw "Expected manifest reuse to keep non-numeric ID." }
+if ($null -ne $reused.changes[0].updates) { throw "Expected updates to stay hidden on plain reuse." }
 if ($reused.warnings.Count -ne 0) { throw "Expected no warnings on plain reuse after an update request." }
 
 $replaced = ConvertFrom-JsonCompat ((& $scriptPath -PromptText "Show updates for change 9003" -Mode mock -MergeMode replace -CacheRoot $cacheRoot | Out-String))
@@ -59,6 +64,7 @@ if ($cleared.change_count -ne 0) { throw "Expected change_count 0 after clear." 
         "initial-load-change-only",
         "append-change-only",
         "explicit-update-enrichment",
+        "non-numeric-id",
         "manifest-reuse-without-updates",
         "replace-with-update-failure",
         "refresh",

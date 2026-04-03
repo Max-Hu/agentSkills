@@ -49,6 +49,21 @@
         "plannedEnd": "2026-03-07T09:00:00Z",
         "description": "Repoint export job to the dedicated analytics cluster."
       }
+    },
+    {
+      "id": "CHG-ALPHA-7",
+      "response": {
+        "id": "CHG-ALPHA-7",
+        "changeNumber": "CHG-ALPHA-7",
+        "title": "Rotate partner webhook secret",
+        "status": "Planned",
+        "service": "partner-webhooks",
+        "risk": "medium",
+        "ownerTeam": "Integrations",
+        "plannedStart": "2026-03-09T01:00:00Z",
+        "plannedEnd": "2026-03-09T01:30:00Z",
+        "description": "Rotate the shared secret used by the external partner webhook gateway."
+      }
     }
   ],
   "updates": [
@@ -92,6 +107,21 @@
     {
       "changeId": "9003",
       "error": "Simulated updates service outage for change 9003."
+    },
+    {
+      "changeId": "CHG-ALPHA-7",
+      "response": {
+        "count": 1,
+        "results": [
+          {
+            "updateID": "UP-ALPHA-1",
+            "timestamp": "2026-03-08T12:00:00Z",
+            "status": "Planned",
+            "comment": "Secret rotation coordinated with the partner team.",
+            "updaterApiUserID": "u-501"
+          }
+        ]
+      }
     }
   ],
   "apiUsers": [

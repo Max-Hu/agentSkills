@@ -2,6 +2,7 @@
 
 这个 skill 用来在 VS Code Chat 里加载一个或多个 ICE change ID 或 change URL，并在当前会话里基于 change 信息持续回答问题。
 默认只查询 change 本体。只有你明确要求“看 update / 更新历史 / 谁做了更新”时，它才会额外调用 updates 和 apiUsers。
+注意：change ID 不要求是纯数字，也可以是类似 `CHG-ALPHA-7` 这样的字符串。
 
 ## 需要哪些配置
 
@@ -30,21 +31,21 @@ https://abc.com/ice/api
 最常用的是直接在 Chat 里提：
 
 ```text
-用 $ice-change-qa 加载 change 9001，并总结当前状态
+用 $ice-change-qa 加载 change CHG-ALPHA-7，并总结当前状态
 ```
 
 如果你想一次加载多个 change：
 
 ```text
 用 $ice-change-qa 加载这些 change，并判断它们是否影响同一个服务：
-9001, 9002, 9003
+9001, 9002, CHG-ALPHA-7
 ```
 
 如果你手上是 URL：
 
 ```text
 用 $ice-change-qa 把这个 change 加入当前上下文：
-https://abc.com/ice/changes/9002
+https://abc.com/ice/changes/CHG-ALPHA-7
 ```
 
 如果你明确想看 update：
@@ -62,7 +63,7 @@ https://abc.com/ice/changes/9002
 如果你想在当前会话里继续追加 change：
 
 ```text
-用 $ice-change-qa 再加入 9004 和 9005，然后继续回答刚才的问题
+用 $ice-change-qa 再加入 CHG-ALPHA-7 和 9005，然后继续回答刚才的问题
 ```
 
 如果你想基于已经加载的 change 继续追问：
@@ -80,7 +81,7 @@ https://abc.com/ice/changes/9002
 如果你想替换当前 change 集合：
 
 ```text
-用 $ice-change-qa 只保留 9003 作为当前上下文
+用 $ice-change-qa 只保留 CHG-ALPHA-7 作为当前上下文
 ```
 
 如果你想清空当前上下文：

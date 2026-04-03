@@ -85,6 +85,17 @@ function Normalize-Token([string]$Value) {
     return $Value.Trim().TrimEnd('.', ',', ';', ')', ']', '>')
 }
 
+function Test-LooksLikeChangeId([string]$Value) {
+    $normalized = Normalize-Token $Value
+    if (-not $normalized) {
+        return $false
+    }
+    if ($normalized -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]*$') {
+        return $false
+    }
+    return ($normalized -match '[0-9]') -or ($normalized -match '[-._:]')
+}
+
 function Test-ShouldFetchUpdates([string]$Text, [bool]$RequestedByFlag) {
     if ($RequestedByFlag) {
         return $true
@@ -159,7 +170,7 @@ function Get-RequestedChangeRefs([string[]]$InputIds, [string]$InputPrompt) {
                 continue
             }
 
-            if ($normalized -match '^[0-9]+$') {
+            if (Test-LooksLikeChangeId $normalized) {
                 Add-RequestedRef $refs $seen $normalized $normalized 'id'
             }
         }
@@ -175,9 +186,11 @@ function Get-RequestedChangeRefs([string[]]$InputIds, [string]$InputPrompt) {
         }
 
         $promptWithoutUrls = [regex]::Replace($InputPrompt, 'https?://[^\s''"\)\]>]+', ' ')
-        $idMatches = [regex]::Matches($promptWithoutUrls, '\b\d+\b')
-        foreach ($match in $idMatches) {
-            Add-RequestedRef $refs $seen $match.Value $match.Value 'id'
+        $tokenMatches = [regex]::Matches($promptWithoutUrls, '\b[A-Za-z0-9][A-Za-z0-9._:-]*\b')
+        foreach ($match in $tokenMatches) {
+            if (Test-LooksLikeChangeId $match.Value) {
+                Add-RequestedRef $refs $seen $match.Value $match.Value 'id'
+            }
         }
     }
 
@@ -767,4 +780,5 @@ try {
 } catch {
     Fail $_.Exception.Message
 }
+
 

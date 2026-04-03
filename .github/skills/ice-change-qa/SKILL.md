@@ -13,27 +13,28 @@ These scripts target Windows PowerShell 5.1 compatibility first and continue to 
 Run the entrypoint directly from the current PowerShell host:
 
 ```powershell
-& .\.github\skills\ice-change-qa\scripts\ice_change_context.ps1 -Ids "9001","9002" -MergeMode append -Mode real
+& .\.github\skills\ice-change-qa\scripts\ice_change_context.ps1 -Ids "9001","CHG-ALPHA-7" -MergeMode append -Mode real
 ```
 
 If you explicitly want update history from the script entrypoint, add `-IncludeUpdates`:
 
 ```powershell
-& .\.github\skills\ice-change-qa\scripts\ice_change_context.ps1 -Ids "9001" -IncludeUpdates -Mode real
+& .\.github\skills\ice-change-qa\scripts\ice_change_context.ps1 -Ids "CHG-ALPHA-7" -IncludeUpdates -Mode real
 ```
 
 ## Core flow
 
 1. Extract zero or more change IDs from `-Ids` or `-PromptText`.
 2. Accept either plain IDs or URLs containing `/changes/{id}`.
-3. Decide whether update enrichment is needed:
+3. Do not assume IDs are numeric only. Accept IDs such as `9001` and `CHG-ALPHA-7`.
+4. Decide whether update enrichment is needed:
    - default: fetch only `v4/changes/{id}`.
    - fetch `v1/changes/{id}/updates` and `v1/apiUsers` only when the user explicitly asks for updates, update history, or who made an update, or when `-IncludeUpdates` is set.
-4. Decide state handling:
+5. Decide state handling:
    - `append` by default when the user adds more change IDs.
    - `replace` when the user explicitly asks to replace or reset the current change set.
    - `-ClearSession` when the user explicitly asks to clear the active ICE change context.
-5. Cache the assembled per-change bundle and return a normalized JSON bundle for QA.
+6. Cache the assembled per-change bundle and return a normalized JSON bundle for QA.
 
 ## Session rules
 
@@ -67,17 +68,17 @@ Use the public skill name in chat and let the skill manage session state.
 Typical prompts:
 
 ```text
-Use $ice-change-qa to load change 9001 and summarize the current state.
+Use $ice-change-qa to load change CHG-ALPHA-7 and summarize the current state.
 ```
 
 ```text
 Use $ice-change-qa to load these changes and answer whether they touch the same service:
-9001, 9002, 9003
+9001, 9002, CHG-ALPHA-7
 ```
 
 ```text
 Use $ice-change-qa to add this change URL to the current ICE change context:
-https://abc.com/ice/changes/9002
+https://abc.com/ice/changes/CHG-ALPHA-7
 ```
 
 ```text
@@ -93,7 +94,7 @@ Use $ice-change-qa to refresh the current ICE change context and answer the same
 ```
 
 ```text
-Use $ice-change-qa to replace the current ICE change context with only change 9003.
+Use $ice-change-qa to replace the current ICE change context with only change CHG-ALPHA-7.
 ```
 
 ```text
@@ -148,3 +149,4 @@ The bundled mock dataset lives at [assets/mock/sample-changes.json](./assets/moc
 - refresh against cached changes
 - partial success when updates fail
 - unresolved updater fallback
+- non-numeric ID parsing
