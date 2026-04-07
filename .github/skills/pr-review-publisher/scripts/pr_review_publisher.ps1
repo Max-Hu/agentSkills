@@ -1,7 +1,7 @@
 param(
     [string]$PrUrl,
     [string]$DraftPath,
-    [ValidateSet("real", "mock")]
+    [ValidateSet("real")]
     [string]$Mode = "real"
 )
 
@@ -69,16 +69,6 @@ try {
     if (-not $DraftPath) { throw 'Provide -DraftPath with the Markdown draft path.' }
     $markdown = Get-Content -Raw -Encoding UTF8 $DraftPath
     $managedBody = Get-ManagedBody $markdown
-    if ($Mode -eq 'mock') {
-        [ordered]@{
-            comment_id = 999999
-            comment_url = "$PrUrl#issuecomment-mock"
-            action = 'created'
-            marker_found = $false
-            pr_url = $PrUrl
-        } | ConvertTo-Json -Depth 20
-        exit 0
-    }
     $prRef = Parse-PrUrl $PrUrl
     $base = Get-GitHubApiBase $prRef.Host
     $existing = $null

@@ -1,9 +1,8 @@
 param(
     [string]$PrUrl,
     [string]$PromptText,
-    [ValidateSet("auto", "real", "mock")]
-    [string]$Mode = "auto",
-    [string]$MockData = ""
+    [ValidateSet("auto", "real")]
+    [string]$Mode = "auto"
 )
 
 Set-StrictMode -Version Latest
@@ -19,10 +18,6 @@ function ConvertFrom-JsonCompat([string]$Json) {
         return $Json | ConvertFrom-Json -Depth 100
     }
     return $Json | ConvertFrom-Json
-}
-
-function Get-DefaultMockDataPath {
-    return Join-Path $PSScriptRoot "..\..\pr-jira-review\assets\mock\default-review-bundle.json"
 }
 
 function Get-PrUrlFromText([string]$Text) {
@@ -85,18 +80,6 @@ function Invoke-JsonGet([string]$Url, [hashtable]$Headers) {
     }
 }
 
-function Load-MockBundle([string]$Path) {
-    $raw = ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
-    return @{
-        pr_url = $raw.pr_url
-        pull = $raw.pull
-        files = @($raw.files)
-        commits = @($raw.commits)
-        issue_comments = @($raw.issue_comments)
-        review_comments = @($raw.review_comments)
-    }
-}
-
 function Fetch-GitHubBundle([hashtable]$PrRef) {
     $base = Get-GitHubApiBase $PrRef.Host
     $repoPath = "/repos/$($PrRef.Owner)/$($PrRef.Repo)"
@@ -114,28 +97,12 @@ function Fetch-GitHubBundle([hashtable]$PrRef) {
 }
 
 try {
-    $resolvedMock = if ($MockData) { $MockData } else { Get-DefaultMockDataPath }
     $resolvedUrl = if ($PrUrl) { $PrUrl } else { Get-PrUrlFromText $PromptText }
-
-    if (-not $resolvedUrl -and $Mode -ne "mock") {
+    if (-not $resolvedUrl) {
         throw "No PR URL found. Provide --PrUrl or include a PR URL in --PromptText."
     }
-
-    if ($Mode -eq "mock") {
-        $modeUsed = "mock"
-        $bundle = Load-MockBundle $resolvedMock
-    } else {
-        try {
-            $modeUsed = "real"
-            $bundle = Fetch-GitHubBundle (Parse-PrUrl $resolvedUrl)
-        } catch {
-            if ($Mode -ne "auto") {
-                throw
-            }
-            $modeUsed = "mock-fallback"
-            $bundle = Load-MockBundle $resolvedMock
-        }
-    }
+    $modeUsed = "real"
+    $bundle = Fetch-GitHubBundle (Parse-PrUrl $resolvedUrl)
 
     $payload = [ordered]@{ mode_used = $modeUsed }
     foreach ($entry in $bundle.GetEnumerator()) {

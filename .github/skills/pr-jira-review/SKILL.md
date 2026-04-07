@@ -14,14 +14,15 @@ Run the `.ps1` entrypoints directly from the current PowerShell host instead of 
 
 1. Extract the PR URL from the request.
 2. Choose mode:
-   - `mock` for demo or offline requests.
-   - `real` when the user explicitly asks for live data.
-   - `auto` by default.
+   - `real` for explicit live review requests.
+   - `auto` by default to infer inputs such as the PR URL, while still using live GitHub and Jira data.
 3. Decide whether subagents should be used.
 4. Gather GitHub context.
 5. Gather Jira context.
 6. Generate the expert review report and Markdown draft.
 7. If the user asks to publish, publish or update the managed PR comment.
+
+If GitHub or Jira access fails, surface the error directly. Do not fall back to placeholder review data.
 
 Run the orchestrator first with the PowerShell script:
 

@@ -1,8 +1,7 @@
 param(
     [string]$InputPath,
-    [ValidateSet("auto", "real", "mock")]
-    [string]$Mode = "auto",
-    [string]$MockData = ""
+    [ValidateSet("auto", "real")]
+    [string]$Mode = "auto"
 )
 
 Set-StrictMode -Version Latest
@@ -18,10 +17,6 @@ function ConvertFrom-JsonCompat([string]$Json) {
         return $Json | ConvertFrom-Json -Depth 100
     }
     return $Json | ConvertFrom-Json
-}
-
-function Get-DefaultMockDataPath {
-    return Join-Path $PSScriptRoot "..\..\pr-jira-review\assets\mock\default-review-bundle.json"
 }
 
 function Get-JiraKeys([object]$Bundle) {
@@ -68,26 +63,6 @@ function Invoke-JsonGet([string]$Url, [hashtable]$Headers) {
     }
 }
 
-function Load-MockBundle([string]$Path, [string[]]$Keys) {
-    $raw = ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
-    $allIssues = $raw.jira_issues
-    $selected = [ordered]@{}
-    if ($Keys.Count -eq 0) {
-        foreach ($prop in $allIssues.PSObject.Properties) {
-            $selected[$prop.Name] = $prop.Value
-        }
-        $selectedKeys = @($selected.Keys)
-    } else {
-        foreach ($key in $Keys) {
-            if ($allIssues.PSObject.Properties.Name -contains $key) {
-                $selected[$key] = $allIssues.$key
-            }
-        }
-        $selectedKeys = $Keys
-    }
-    return @{ jira_keys = $selectedKeys; jira_issues = $selected }
-}
-
 function Fetch-JiraIssues([string[]]$Keys) {
     if (-not $env:JIRA_BASE_URL) {
         throw "Live mode requires JIRA_BASE_URL."
@@ -109,27 +84,15 @@ try {
     if (-not $InputPath) {
         throw "Provide -InputPath with a GitHub bundle JSON file."
     }
-    $resolvedMock = if ($MockData) { $MockData } else { Get-DefaultMockDataPath }
     $bundle = ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $InputPath)
     $keys = @(Get-JiraKeys $bundle)
 
-    if ($Mode -eq "mock") {
-        $modeUsed = "mock"
-        $jiraBundle = Load-MockBundle $resolvedMock $keys
-    } elseif ($keys.Count -eq 0) {
+    if ($keys.Count -eq 0) {
         $modeUsed = "no-jira"
         $jiraBundle = @{ jira_keys = @(); jira_issues = [ordered]@{} }
     } else {
-        try {
-            $modeUsed = "real"
-            $jiraBundle = @{ jira_keys = $keys; jira_issues = Fetch-JiraIssues $keys }
-        } catch {
-            if ($Mode -ne "auto") {
-                throw
-            }
-            $modeUsed = "mock-fallback"
-            $jiraBundle = Load-MockBundle $resolvedMock $keys
-        }
+        $modeUsed = "real"
+        $jiraBundle = @{ jira_keys = $keys; jira_issues = Fetch-JiraIssues $keys }
     }
 
     $payload = [ordered]@{ mode_used = $modeUsed }

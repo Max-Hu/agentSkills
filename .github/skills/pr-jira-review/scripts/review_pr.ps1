@@ -1,9 +1,8 @@
 param(
     [string]$PrUrl,
     [string]$PromptText,
-    [ValidateSet("auto", "real", "mock")]
+    [ValidateSet("auto", "real")]
     [string]$Mode = "auto",
-    [string]$MockData = "",
     [string]$DraftPath,
     [ValidateSet("markdown", "json")]
     [string]$OutputFormat = "markdown"
@@ -28,10 +27,6 @@ function ConvertFrom-JsonCompat([string]$Json) {
 function Get-ValueOrDefault([object]$Value, [object]$Default) {
     if ($null -eq $Value) { return $Default }
     return $Value
-}
-
-function Get-DefaultMockDataPath {
-    return Join-Path $PSScriptRoot "..\assets\mock\default-review-bundle.json"
 }
 
 function Get-PrUrlFromText([string]$Text) {
@@ -69,10 +64,6 @@ function Get-JiraHeaders {
 
 function Invoke-JsonGet([string]$Url, [hashtable]$Headers) {
     try { return Invoke-RestMethod -Uri $Url -Headers $Headers -Method Get } catch { throw ("Network error for {0}: {1}" -f $Url, $_.Exception.Message) }
-}
-
-function Load-MockBundle([string]$Path) {
-    return ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
 }
 
 function Get-JiraKeys([object]$Bundle) {
@@ -133,7 +124,7 @@ function Get-Orchestration([string]$RequestedMode, [string]$ModeUsed, [string]$R
     if ($changedFiles -gt 15 -or $churn -ge 600) { $reasons += 'Large PR size crosses the threshold for parallel analysis.' }
     if ($JiraKeys.Count -gt 1) { $reasons += 'Multiple Jira keys were detected and can be investigated independently.' }
     if ($ResolvedPromptText -and $ResolvedPromptText -match '\b(subagent|parallel|deep|depth|thorough)\b') { $reasons += 'The user explicitly asked for deeper or parallel review behavior.' }
-    $useSubagents = ($reasons.Count -gt 0 -and $ModeUsed -ne 'mock-fallback')
+    $useSubagents = ($reasons.Count -gt 0)
     return [ordered]@{
         use_subagents = $useSubagents
         requested_mode = $RequestedMode
@@ -152,28 +143,16 @@ function Get-Orchestration([string]$RequestedMode, [string]$ModeUsed, [string]$R
 }
 
 try {
-    $resolvedMock = if ($MockData) { $MockData } else { Get-DefaultMockDataPath }
     $resolvedUrl = if ($PrUrl) { $PrUrl } else { Get-PrUrlFromText $PromptText }
-    if (-not $resolvedUrl -and $Mode -ne 'mock') { throw 'No PR URL found. Provide --PrUrl or include a PR URL in --PromptText.' }
-    if ($Mode -eq 'mock') {
-        $modeUsed = 'mock'
-        $bundle = Load-MockBundle $resolvedMock
-    } else {
-        try {
-            $githubBundle = Fetch-GitHubBundle (Parse-PrUrl $resolvedUrl)
-            $keys = Get-JiraKeys $githubBundle
-            $jiraIssues = if ($keys.Count -gt 0) { Fetch-JiraIssues $keys } else { [ordered]@{} }
-            $bundle = [ordered]@{}
-            foreach ($entry in $githubBundle.GetEnumerator()) { $bundle[$entry.Key] = $entry.Value }
-            $bundle.jira_keys = $keys
-            $bundle.jira_issues = $jiraIssues
-            $modeUsed = 'real'
-        } catch {
-            if ($Mode -ne 'auto') { throw }
-            $modeUsed = 'mock-fallback'
-            $bundle = Load-MockBundle $resolvedMock
-        }
-    }
+    if (-not $resolvedUrl) { throw 'No PR URL found. Provide --PrUrl or include a PR URL in --PromptText.' }
+    $githubBundle = Fetch-GitHubBundle (Parse-PrUrl $resolvedUrl)
+    $keys = Get-JiraKeys $githubBundle
+    $jiraIssues = if ($keys.Count -gt 0) { Fetch-JiraIssues $keys } else { [ordered]@{} }
+    $bundle = [ordered]@{}
+    foreach ($entry in $githubBundle.GetEnumerator()) { $bundle[$entry.Key] = $entry.Value }
+    $bundle.jira_keys = $keys
+    $bundle.jira_issues = $jiraIssues
+    $modeUsed = 'real'
 
     $tempBundle = Join-Path $env:TEMP ([IO.Path]::GetRandomFileName() + '.json')
     try {

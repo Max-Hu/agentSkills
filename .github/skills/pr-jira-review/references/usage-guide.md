@@ -38,11 +38,13 @@ https://github.com/acme/payments-service/pull/123
 
 The orchestrator should:
 
-- choose `mock`, `real`, or `auto`
+- choose `real` or `auto`
 - decide whether subagents are worth using
 - return the structured report
 - write an editable Markdown draft
 - expose the publish target for later comment publishing
+
+`auto` only helps infer inputs such as the PR URL. It does not provide fallback behavior; GitHub or Jira failures should be surfaced directly.
 
 ## 5. Orchestrator Command
 
