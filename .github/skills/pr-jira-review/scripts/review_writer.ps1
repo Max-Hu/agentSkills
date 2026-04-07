@@ -35,6 +35,16 @@ function Get-ValueOrDefault([object]$Value, [object]$Default) {
     return $Value
 }
 
+function Get-ObjectPropertyValue([object]$InputObject, [string]$Name, [object]$Default) {
+    if ($null -eq $InputObject) { return $Default }
+    if ($InputObject -is [System.Collections.IDictionary]) {
+        if ($InputObject.Contains($Name)) { return $InputObject[$Name] }
+        return $Default
+    }
+    if ($InputObject.PSObject.Properties.Name -contains $Name) { return $InputObject.$Name }
+    return $Default
+}
+
 function Get-Json([string]$Path) {
     return ConvertFrom-JsonCompat (Get-Content -Raw -Encoding UTF8 $Path)
 }
@@ -135,6 +145,52 @@ function Get-PatchExcerpt([string]$Patch) {
     return $excerpt
 }
 
+function Get-PatchSignalSnippet([string]$Patch, [string[]]$MatchPatterns, [string]$FallbackExcerpt) {
+    if ([string]::IsNullOrWhiteSpace($Patch)) { return $FallbackExcerpt }
+    $filteredLines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($Patch -split "`r?`n")) {
+        if ($line.StartsWith('+++') -or $line.StartsWith('---')) { continue }
+        if ($line.StartsWith('@@') -or $line.StartsWith('+') -or $line.StartsWith('-')) {
+            [void]$filteredLines.Add($line)
+        }
+    }
+    if ($filteredLines.Count -eq 0) { return $FallbackExcerpt }
+    $patterns = @($MatchPatterns | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $matchIndex = -1
+    for ($index = 0; $index -lt $filteredLines.Count; $index++) {
+        $line = $filteredLines[$index]
+        foreach ($pattern in $patterns) {
+            if ($line -match $pattern) {
+                $matchIndex = $index
+                break
+            }
+        }
+        if ($matchIndex -ge 0) { break }
+    }
+    if ($matchIndex -lt 0) { return $FallbackExcerpt }
+    $start = [Math]::Max(0, $matchIndex - 2)
+    $end = [Math]::Min($filteredLines.Count - 1, $matchIndex + 2)
+    $snippetLines = New-Object System.Collections.Generic.List[string]
+    for ($index = $start; $index -le $end; $index++) {
+        [void]$snippetLines.Add($filteredLines[$index])
+    }
+    if (@($snippetLines | Where-Object { $_.StartsWith('@@') }).Count -eq 0) {
+        for ($index = $matchIndex; $index -ge 0; $index--) {
+            if ($filteredLines[$index].StartsWith('@@')) {
+                $snippetLines.Insert(0, $filteredLines[$index])
+                break
+            }
+        }
+    }
+    while ($snippetLines.Count -gt 8) {
+        $snippetLines.RemoveAt($snippetLines.Count - 1)
+    }
+    $snippet = ($snippetLines -join "`n").Trim()
+    if ($snippet.Length -gt 600) { $snippet = $snippet.Substring(0, 597).TrimEnd() + '...' }
+    if (-not $snippet) { return $FallbackExcerpt }
+    return $snippet
+}
+
 function Get-CommentExcerpts([object[]]$Comments, [int]$Limit) {
     $items = @()
     foreach ($comment in @($Comments) | Select-Object -First $Limit) {
@@ -148,8 +204,21 @@ function Get-CommentExcerpts([object[]]$Comments, [int]$Limit) {
     return $items
 }
 
-function New-Finding([string]$Severity, [string]$Category, [string]$Title, [string]$Details, [string]$SuggestedFix, [object[]]$EvidenceRefs) {
+function New-CodeDetail([hashtable]$FileEntry, [string]$PatchText, [string]$MatchReason, [string[]]$MatchPatterns) {
+    if (-not $FileEntry) { return $null }
+    $snippet = Get-PatchSignalSnippet $PatchText $MatchPatterns (Get-ValueOrDefault $FileEntry.patch_excerpt '')
     return [ordered]@{
+        file = $FileEntry.filename
+        language = $FileEntry.language
+        review_target = $FileEntry.review_target
+        snippet = $snippet
+        match_reason = $MatchReason
+    }
+}
+
+function New-Finding([string]$Severity, [string]$Category, [string]$Title, [string]$Details, [string]$SuggestedFix, [object[]]$EvidenceRefs, [string]$PrimaryFile, [hashtable]$CodeDetail, [string]$ReferenceFix, [string]$ReferenceTest) {
+    if (-not $PrimaryFile -and $CodeDetail -and $CodeDetail.file) { $PrimaryFile = [string]$CodeDetail.file }
+    $finding = [ordered]@{
         severity = $Severity
         category = $Category
         title = $Title
@@ -158,13 +227,61 @@ function New-Finding([string]$Severity, [string]$Category, [string]$Title, [stri
         suggested_fix = $SuggestedFix
         evidence_refs = $EvidenceRefs
     }
+    if ($PrimaryFile) { $finding.primary_file = $PrimaryFile }
+    if ($CodeDetail) { $finding.code_detail = $CodeDetail }
+    if ($ReferenceFix) { $finding.reference_fix = $ReferenceFix }
+    if ($ReferenceTest) { $finding.reference_test = $ReferenceTest }
+    return $finding
 }
 
-function New-CodeFinding([string]$Severity, [string]$Title, [string]$Details, [string]$SuggestedFix, [object[]]$EvidenceRefs) {
-    return New-Finding $Severity 'Code Quality' $Title $Details $SuggestedFix $EvidenceRefs
+function New-CodeFinding([string]$Severity, [string]$Title, [string]$Details, [string]$SuggestedFix, [object[]]$EvidenceRefs, [hashtable]$FileEntry, [string]$PatchText, [string]$MatchReason, [string[]]$MatchPatterns, [string]$ReferenceFix, [string]$ReferenceTest) {
+    $codeDetail = New-CodeDetail $FileEntry $PatchText $MatchReason $MatchPatterns
+    $primaryFile = if ($FileEntry) { $FileEntry.filename } else { $null }
+    return New-Finding $Severity 'Code Quality' $Title $Details $SuggestedFix $EvidenceRefs $primaryFile $codeDetail $ReferenceFix $ReferenceTest
 }
 function Sort-Findings([object[]]$Findings) {
     return @($Findings | Sort-Object @{Expression={ $SeverityOrder[$_.severity] }}, @{Expression={ if ($CategoryOrder.ContainsKey($_.category)) { $CategoryOrder[$_.category] } else { 99 } }}, @{Expression={ $_.title }})
+}
+
+function Get-ReferenceFixLanguage([object]$Finding) {
+    $codeDetail = Get-ObjectPropertyValue $Finding 'code_detail' $null
+    $path = if ($codeDetail -and (Get-ObjectPropertyValue $codeDetail 'file' $null)) { [string](Get-ObjectPropertyValue $codeDetail 'file' '') } else { [string](Get-ObjectPropertyValue $Finding 'primary_file' '') }
+    $reviewTarget = if ($codeDetail) { [string](Get-ObjectPropertyValue $codeDetail 'review_target' '') } else { '' }
+    $leaf = [IO.Path]::GetFileName($path).ToLowerInvariant()
+    $extension = [IO.Path]::GetExtension($path).ToLowerInvariant()
+    switch ($reviewTarget) {
+        'java-source' { return 'java' }
+        'spring-config' {
+            if ($extension -in @('.yml', '.yaml')) { return 'yaml' }
+            if ($extension -eq '.properties') { return 'properties' }
+            if ($extension -eq '.xml') { return 'xml' }
+            return 'text'
+        }
+        'resource-config' {
+            if ($extension -in @('.yml', '.yaml')) { return 'yaml' }
+            if ($extension -eq '.properties') { return 'properties' }
+            if ($extension -eq '.json') { return 'json' }
+            if ($extension -eq '.xml') { return 'xml' }
+            return 'text'
+        }
+        'build-config' {
+            if ($leaf -eq 'pom.xml') { return 'xml' }
+            if ($leaf -eq 'build.gradle.kts') { return 'kotlin' }
+            if ($leaf -eq 'build.gradle') { return 'groovy' }
+            return 'text'
+        }
+        'logging-config' { return 'xml' }
+    }
+    return 'text'
+}
+
+function Add-CodeBlock([System.Collections.Generic.List[string]]$Lines, [string]$Language, [string]$Content) {
+    if ([string]::IsNullOrWhiteSpace($Content)) { return }
+    [void]$Lines.Add(('```' + $Language))
+    foreach ($line in ($Content -split "`r?`n")) {
+        [void]$Lines.Add($line)
+    }
+    [void]$Lines.Add('```')
 }
 function Get-TestSuggestions([string[]]$ReviewTargets, [object[]]$CodeFiles, [object[]]$TestFiles, [string[]]$RiskyPaths) {
     $items = [System.Collections.Generic.List[string]]::new()
@@ -351,12 +468,12 @@ function Build-StructuredFindings([string[]]$JiraKeys, [string[]]$AlignmentFindi
     foreach ($message in $TestFindings) {
         if ($message.StartsWith('Observed') -or $message.StartsWith('No executable')) { continue }
         if ($message.StartsWith('Code changed without')) {
-            $findings += New-Finding 'high' 'Test Gap' 'Test coverage is missing for changed implementation' $message 'Add tests that cover the modified Java or Spring behavior before merging.' @($message)
+            $findings += New-Finding 'high' 'Test Gap' 'Test coverage is missing for changed implementation' $message 'Add tests that cover the modified Java or Spring behavior before merging.' @($message) $null $null $null 'Add tests that cover the modified Java or Spring behavior before merging.'
         } elseif ($message.StartsWith('Test Gap: ')) {
             $title = $message.Substring(10)
-            $findings += New-Finding 'medium' 'Test Gap' $title $message ('Implement: ' + $title) @($message)
+            $findings += New-Finding 'medium' 'Test Gap' $title $message ('Implement: ' + $title) @($message) $null $null $null $title
         } else {
-            $findings += New-Finding 'medium' 'Test Gap' $message $message 'Add the missing regression coverage described by this gap before approval.' @($message)
+            $findings += New-Finding 'medium' 'Test Gap' $message $message 'Add the missing regression coverage described by this gap before approval.' @($message) $null $null $null $message
         }
     }
     foreach ($excerpt in @($ReviewCommentExcerpts | Select-Object -First 4)) {
@@ -374,6 +491,8 @@ function Build-StructuredFindings([string[]]$JiraKeys, [string[]]$AlignmentFindi
             summary = $_.summary
             suggested_fix = $_.suggested_fix
             evidence_refs = $_.evidence_refs
+            primary_file = Get-ObjectPropertyValue $_ 'primary_file' $null
+            has_code_detail = [bool](Get-ObjectPropertyValue $_ 'code_detail' $null)
         }
     })
     return @{ detailed = $sorted; summary = $summary }
@@ -414,15 +533,29 @@ function Render-Markdown([hashtable]$Report) {
     [void]$lines.Add('')
     [void]$lines.Add('## Detailed Analysis And Suggested Fixes')
     foreach ($item in @($analysis.detailed_findings)) {
+        $codeDetail = Get-ObjectPropertyValue $item 'code_detail' $null
+        $referenceFix = Get-ObjectPropertyValue $item 'reference_fix' $null
+        $referenceTest = Get-ObjectPropertyValue $item 'reference_test' $null
         foreach ($line in @(
             "### $($severityEmoji[$item.severity]) $($item.title)",
             "- Severity: $($severityLabel[$item.severity])",
             "- Category: $($item.category)",
             "- Analysis: $($item.details)",
-            "- Suggested change: $($item.suggested_fix)",
-            "- Evidence: $((@($item.evidence_refs) -join ' | '))",
-            ''
+            "- Suggested change: $($item.suggested_fix)"
         )) { [void]$lines.Add($line) }
+        if ($codeDetail -and (Get-ObjectPropertyValue $codeDetail 'snippet' $null)) {
+            [void]$lines.Add('- Triggered diff:')
+            Add-CodeBlock $lines 'diff' (Get-ObjectPropertyValue $codeDetail 'snippet' '')
+        }
+        if ($referenceFix) {
+            [void]$lines.Add('- Reference fix (reference only):')
+            Add-CodeBlock $lines (Get-ReferenceFixLanguage $item) $referenceFix
+        }
+        if ($referenceTest) {
+            [void]$lines.Add("- Reference test: $referenceTest")
+        }
+        [void]$lines.Add("- Evidence: $((@($item.evidence_refs) -join ' | '))")
+        [void]$lines.Add('')
     }
     if (@($analysis.detailed_findings).Count -eq 0) {
         [void]$lines.Add('No actionable findings were detected automatically.')
